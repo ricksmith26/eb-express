@@ -2,6 +2,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import dotenv from "dotenv";
 import User from "../models/User.js";
+import {GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL} from '../config/vars.js'
 
 dotenv.config();
 
@@ -33,9 +34,10 @@ passport.use(
           });
           await user.save();
         }
-
+        console.log(user)
         return done(null, user);
       } catch (error) {
+        console.log(error)
         return done(error, null);
       }
     }

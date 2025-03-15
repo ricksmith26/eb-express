@@ -1,27 +1,144 @@
 import createError from 'http-errors';
 import express from "express";
-import path from 'path';
+import { createServer } from 'node:http';
 import cookieParser from 'cookie-parser';
+import { Server } from 'socket.io';
 import logger from 'morgan';
+import cors from "cors";
 import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
 import patientsRouter from './routes/patientsRouter.js';
 import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import livekitRoutes from './routes/livekitRoutes.js';
+import imagesRouter from './routes/imagesRoutes.js';
 import connectDB from './config/db.js';
+import passport from "passport";
+import session from "express-session"
+import "./config/passport.js";
 
 
-var app = express();
+
+const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
+});
+
+app.use(
+  session({
+    secret: process.env.JWT_SECRET || "default-secret", // Replace with a secure secret
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false }, // Set `true` if using HTTPS
+  })
+);
+app.use(passport.initialize());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true, // ✅ Allow cookies to be sent
+  })
+);
+
 
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
 connectDB();
 
 app.use('/', indexRouter);
+
+app.use("/auth", authRoutes);
 app.use('/patients', patientsRouter);
 app.use('/users', usersRouter);
 app.use("/relatedPerson", relatedPersonRoutes);
+app.use("/images", imagesRouter)
+app.use("/api/livekit", livekitRoutes);
+
+
+const users = new Map();
+io.on('connection', (socket) => {
+  console.log(`⚡: ${socket.id} user just connected!`);
+
+  socket.on('register', (email) => {
+    users.set(email, socket.id);
+    console.log(`User registered: ${email} -> ${socket.id}`);
+  });
+
+  // Handle private messages
+  socket.on('privateMessage', ({ toEmail, message, type }) => {
+    console.log({ toEmail, message, type })
+    const recipientSocketId = users.get(toEmail);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit('message', { type, message });
+      console.log(`Message sent to ${toEmail}`);
+    } else {
+      console.log(`User ${toEmail} is not connected`);
+    }
+  });
+
+  socket.on("callUser", ({ toEmail, offer }) => {
+    const recipientSocketId = users.get(toEmail);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("offer", { from: getUserEmail(socket.id), offer });
+    }
+  });
+
+  socket.on("acceptCall", ({ from }) => {
+    const recipientSocketId = users.get(from);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("callAccepted", { from: getUserEmail(socket.id) });
+    }
+  });
+
+  socket.on("hangup", ({ toEmail }) => {
+    const recipientSocketId = users.get(toEmail);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("hangup", toEmail);
+      console.log(`Call hangup event sent to ${toEmail}`);
+    } else {
+      console.log(`User ${toEmail} is not connected.`);
+    }
+  });
+
+  socket.on("answer", ({ to, answer }) => {
+    const recipientSocketId = users.get(to);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("answer", { answer });
+    }
+  });
+
+  socket.on("iceCandidate", ({ to, candidate }) => {
+    const recipientSocketId = users.get(to);
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("iceCandidate", { candidate });
+    }
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    for (const [email, id] of users.entries()) {
+      if (id === socket.id) {
+        users.delete(email);
+        console.log(`User disconnected: ${email}`);
+        break;
+      }
+    }
+  });
+  socket.on("message", (message) => {
+    socket.broadcast.emit("message", message);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔥: A user disconnected');
+  });
+});
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -39,4 +156,5 @@ app.use(function(err, req, res, next) {
   res.send('error');
 });
 
-export default app;
+
+export default server;
