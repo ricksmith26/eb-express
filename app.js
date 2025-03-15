@@ -16,8 +16,8 @@ import connectDB from './config/db.js';
 import passport from "passport";
 import session from "express-session"
 import "./config/passport.js";
-
-import * as Sentry from "./instrument.js";
+import "./instrument";
+import * as Sentry from "@sentry/node";
 
 const app = express();
 const server = createServer(app);
