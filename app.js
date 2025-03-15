@@ -17,7 +17,7 @@ import passport from "passport";
 import session from "express-session"
 import "./config/passport.js";
 
-
+import Sentry from "./instrument.js";
 
 const app = express();
 const server = createServer(app);
@@ -60,7 +60,7 @@ app.use("/relatedPerson", relatedPersonRoutes);
 app.use("/images", imagesRouter)
 app.use("/api/livekit", livekitRoutes);
 
-
+Sentry.setupExpressErrorHandler(app);
 const users = new Map();
 io.on('connection', (socket) => {
   console.log(`⚡: ${socket.id} user just connected!`);
