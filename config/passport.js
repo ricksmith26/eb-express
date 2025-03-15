@@ -1,10 +1,6 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import dotenv from "dotenv";
-import User from "../models/User.js";
-import {GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL} from '../config/vars.js'
-
-dotenv.config();
+import User from "../models/User.js"; // Adjust path to your User model
 
 passport.use(
   new GoogleStrategy(
@@ -12,48 +8,49 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: process.env.GOOGLE_CALLBACK_URL,
-      passReqToCallback: true, // ✅ Required to access refreshToken
+      passReqToCallback: true, // ✅ Ensures full control over request
     },
-    async (req, accessToken, refreshToken, profile, done) => {
+    async (request, accessToken, refreshToken, profile, done) => {
       try {
-        console.log(refreshToken, '<<<<refreshToken')
         let user = await User.findOne({ googleId: profile.id });
 
-        if (user) {
-          user.accessToken = accessToken;
-          if (refreshToken) user.refreshToken = refreshToken; // ✅ Store refresh token
-          await user.save();
-        } else {
+        if (!user) {
           user = new User({
             googleId: profile.id,
-            name: profile.displayName,
             email: profile.emails[0].value,
+            name: profile.displayName,
             picture: profile.photos[0].value,
-            accessToken,
-            refreshToken, // ✅ Save refresh token for future use
+            accessToken: accessToken,
+            refreshToken: refreshToken,
           });
           await user.save();
         }
-        console.log(user)
+
+        console.log("✅ User authenticated, passing to serializeUser:", user);
+
         return done(null, user);
       } catch (error) {
-        console.log(error)
         return done(error, null);
       }
     }
   )
 );
 
-// ✅ Serialize & Deserialize User for Sessions
+// ✅ Serialize user into the session (store only ID to keep session small)
 passport.serializeUser((user, done) => {
+  console.log("✅ Serializing user ID:", user.id);
   done(null, user.id);
 });
 
+// ✅ Deserialize user from session (fetch full user object)
 passport.deserializeUser(async (id, done) => {
   try {
+    console.log("🔄 Deserializing user ID:", id);
     const user = await User.findById(id);
     done(null, user);
   } catch (error) {
-    done(error, null);
+    done(error);
   }
 });
+
+export default passport;

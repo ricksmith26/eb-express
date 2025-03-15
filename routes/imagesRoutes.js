@@ -13,6 +13,7 @@ const auth = new google.auth.OAuth2(
 
 // Route to get LiveKit connection details
 router.get("/image/:fileId/:email", async (req, res) => {
+    console.log(req.session, '<<<req.session')
     const email = req.params.email;
     const user = await User.findOne({ email });
     auth.setCredentials({ refresh_token: user.refreshToken });

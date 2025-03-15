@@ -24,11 +24,21 @@ router.get(
   })
 );
 
+// router.get('/auth/google/callback', 
+//   passport.authenticate('google', { failureRedirect: '/login' }),
+//   function(req, res) {
+//     // console.log(req.user
+//     //   , "<<<<<req, /auth/google/callback")
+//     // Successful authentication, redirect home.
+//     res.redirect('/');
+//   });
+
 // ✅ Google OAuth Callback
 router.get(
   "/google/callback",
   (req, res, next) => {
     passport.authenticate("google", async (err, user, info) => {
+      console.log(req.session, '<><<><><><>req.session<',req.user)
       if (err) {
         console.error("🚨 Google OAuth Error:", err);
         return res.status(500).json({ error: "Google authentication failed", details: err.message });
@@ -50,7 +60,9 @@ router.get(
 
         // Set cookie with email
         res.cookie('email', user.email);
-
+        res.cookie('refreshtoken', user.refreshtoken);
+            // console.log(req, "<<<<")
+            req.header("refreshtoken>>",user.refreshtoken)
         // Ensure accessToken exists
         if (!user.accessToken) {
           console.error("🚨 No Google OAuth token received from MongoDB!");
@@ -74,12 +86,24 @@ router.get("/logout", (req, res) => {
 
 // ✅ Get Logged-in User Info
 router.get("/me/", async (req, res) => {
+  console.log("Session Data:", req.session); // ✅ Debugging: Check if session exists
+  console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
+
   try {
-    const user = await User.findOne({ email: req.cookies.email });
-    console.log(user, "<<<<<")
+    if (!req.user) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    // ✅ Get user from MongoDB using session user ID
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     return res.json(user);
   } catch (error) {
-    return res.status(error.status).json({ error });
+    console.error("🚨 Error fetching user session:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 

@@ -13,7 +13,8 @@ import authRoutes from "./routes/authRoutes.js";
 import livekitRoutes from './routes/livekitRoutes.js';
 import imagesRouter from './routes/imagesRoutes.js';
 import connectDB from './config/db.js';
-import passport from "passport";
+import passport from "./config/passport.js";
+import MongoStore from "connect-mongo";
 import session from "express-session"
 import "./config/passport.js";
 import "./instrument.js";
@@ -27,14 +28,25 @@ const io = new Server(server, {
   }
 });
 
+// import session from "express-session";
+// import MongoStore from "connect-mongo";
+
+app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse proxies
+
+
 app.use(
   session({
-    secret: process.env.JWT_SECRET || "default-secret", // Replace with a secure secret
+    secret: process.env.JWT_SECRET || "default-secret",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }, // Set `true` if using HTTPS
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_DB_URL, // ✅ Store sessions in MongoDB
+      collectionName: "sessions",
+    })
   })
 );
+
+app.use(passport.authenticate('session'));
 app.use(passport.initialize());
 app.use(
   cors({
@@ -42,6 +54,7 @@ app.use(
     credentials: true, // ✅ Allow cookies to be sent
   })
 );
+
 
 
 app.use(logger('dev'));
