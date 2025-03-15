@@ -6,6 +6,7 @@ import logger from 'morgan';
 import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
 import patientsRouter from './routes/patientsRouter.js';
+import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import connectDB from './config/db.js';
 
 
@@ -20,6 +21,7 @@ connectDB();
 app.use('/', indexRouter);
 app.use('/patients', patientsRouter);
 app.use('/users', usersRouter);
+app.use("/relatedPerson", relatedPersonRoutes);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
