@@ -34,47 +34,34 @@ router.get(
 //   });
 
 // ✅ Google OAuth Callback
-router.get(
-  "/google/callback",
-  (req, res, next) => {
-    passport.authenticate("google", async (err, user, info) => {
-      console.log(req.session, '<><<><><><>req.session<',req.user)
-      if (err) {
-        console.error("🚨 Google OAuth Error:", err);
-        return res.status(500).json({ error: "Google authentication failed", details: err.message });
+router.get("/google/callback", (req, res, next) => {
+  passport.authenticate("google", async (err, user, info) => {
+    console.log(user, '<<<<<USER')
+    if (err) {
+      console.error("🚨 Google OAuth Error:", err);
+      return res.status(500).json({ error: "Google authentication failed", details: err.message });
+    }
+    if (!user) {
+      console.error("🚨 Google OAuth User Not Found:", info);
+      return res.status(401).json({ error: "No user returned from Google authentication" });
+    }
+
+    console.log(`✅ Google User Authenticated: ${user.email}`);
+
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        console.error("🚨 Login Error:", loginErr);
+        return res.status(500).json({ error: "Session login failed" });
       }
-      if (!user) {
-        console.error("🚨 Google OAuth User Not Found:", info);
-        return res.status(401).json({ error: "No user returned from Google authentication" });
-      }
 
-      // Log the user details
-      console.log(`✅ Google User Authenticated: ${user.email}`);
+      // ✅ Store user in session manually
+      req.session.user = user;
+      console.log("✅ Stored user in session:", req.session.user);
 
-      // Manually log the user in
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          console.error("🚨 Login Error:", loginErr);
-          return res.status(500).json({ error: "Session login failed", details: loginErr.message });
-        }
-
-        // Set cookie with email
-        res.cookie('email', user.email);
-        res.cookie('refreshtoken', user.refreshtoken);
-            // console.log(req, "<<<<")
-            req.header("refreshtoken>>",user.refreshtoken)
-        // Ensure accessToken exists
-        if (!user.accessToken) {
-          console.error("🚨 No Google OAuth token received from MongoDB!");
-          return res.status(401).json({ error: "Failed to get Google OAuth token" });
-        }
-
-        // Redirect to frontend
-        return res.redirect(process.env.FRONTEND_URL);
-      });
-    })(req, res, next);
-  }
-);
+      res.redirect(process.env.FRONTEND_URL);
+    });
+  })(req, res, next);
+});
 
 // ✅ Logout & Clear Session
 router.get("/logout", (req, res) => {
@@ -88,7 +75,6 @@ router.get("/logout", (req, res) => {
 router.get("/me/", async (req, res) => {
   console.log("Session Data:", req.session); // ✅ Debugging: Check if session exists
   console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
-
   try {
     if (!req.user) {
       return res.status(401).json({ error: "User not authenticated" });

@@ -11,6 +11,7 @@ passport.use(
       passReqToCallback: true, // ✅ Ensures full control over request
     },
     async (request, accessToken, refreshToken, profile, done) => {
+      console.error(profile, '<><><><><>profile<<<<<<<')
       try {
         let user = await User.findOne({ googleId: profile.id });
 

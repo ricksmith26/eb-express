@@ -20,6 +20,7 @@ import "./config/passport.js";
 import "./instrument.js";
 import * as Sentry from "@sentry/node";
 
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -32,7 +33,20 @@ const io = new Server(server, {
 // import MongoStore from "connect-mongo";
 
 app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse proxies
+console.log(process.env.MONGO_DB_URL, '<<process.env.MONGO_DB_URL')
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL, // Ensure this matches your frontend URL
+    credentials: true, // Allow cookies
+  })
+);
 
+// ✅ 2. JSON Parsing Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ 3. Session Middleware (After CORS)
+console.log(`🔍 Connecting to MongoDB for sessions at: ${process.env.MONGO_DB_URL}`);
 
 app.use(
   session({
@@ -40,22 +54,25 @@ app.use(
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-      mongoUrl: process.env.MONGO_DB_URL, // ✅ Store sessions in MongoDB
+      mongoUrl: process.env.MONGO_DB_URL,
       collectionName: "sessions",
-    })
+      autoRemove: "native", // Clean up expired sessions automatically
+    }),
+    // cookie: {
+    //   secure: process.env.NODE_ENV === "production", // Secure in production
+    //   httpOnly: false, // Prevents JavaScript access
+    //   sameSite: "none", // Required for cross-origin authentication
+    // },
   })
 );
+
+app.use((req, res, next) => {
+  console.log("📝 Session Middleware Debug: ", req.session);
+  next();
+});
 
 app.use(passport.authenticate('session'));
 app.use(passport.initialize());
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true, // ✅ Allow cookies to be sent
-  })
-);
-
-
 
 app.use(logger('dev'));
 app.use(express.json());
