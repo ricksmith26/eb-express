@@ -28,7 +28,6 @@ const io = new Server(server, {
     origin: "*"
   }
 });
-
 // import session from "express-session";
 // import MongoStore from "connect-mongo";
 
@@ -41,6 +40,7 @@ app.use(
   })
 );
 
+
 // ✅ 2. JSON Parsing Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -48,30 +48,29 @@ app.use(express.urlencoded({ extended: true }));
 // ✅ 3. Session Middleware (After CORS)
 console.log(`🔍 Connecting to MongoDB for sessions at: ${process.env.MONGO_DB_URL}`);
 
-app.use(
-  session({
-    secret: process.env.JWT_SECRET || "default-secret",
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGO_DB_URL,
-      collectionName: "sessions",
-      autoRemove: "native", // Clean up expired sessions automatically
-    }),
-    // cookie: {
-    //   secure: process.env.NODE_ENV === "production", // Secure in production
-    //   httpOnly: false, // Prevents JavaScript access
-    //   sameSite: "none", // Required for cross-origin authentication
-    // },
-  })
-);
+app.use(session({
+  secret: process.env.JWT_SECRET || "default-secret",
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_DB_URL,
+    collectionName: "sessions",
+  }),
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 1 day expiration
+    httpOnly: true, // Prevent JavaScript access
+    secure: process.env.NODE_ENV === "production", // Use HTTPS only in production
+    // sameSite: "None", // Required for cross-site authentication
+    path: "/", // Cookie accessible across the entire site
+  },
+}));
 
 app.use((req, res, next) => {
   console.log("📝 Session Middleware Debug: ", req.session);
   next();
 });
 
-app.use(passport.authenticate('session'));
+// app.use(passport.authenticate('session'));
 app.use(passport.initialize());
 
 app.use(logger('dev'));
@@ -164,11 +163,14 @@ io.on('connection', (socket) => {
   socket.on("message", (message) => {
     socket.broadcast.emit("message", message);
   });
-
-  socket.on('disconnect', () => {
-    console.log('🔥: A user disconnected');
-  });
 });
+
+function getUserEmail(socketId) {
+  for (const [email, id] of users.entries()) {
+    if (id === socketId) return email;
+  }
+  return null;
+}
 
 
 // catch 404 and forward to error handler

@@ -35,7 +35,7 @@ router.get("/image/:fileId/:email", async (req, res) => {
 });
 
 router.get("/all", async (req, res) => {
-    const email = req.cookies.email;
+    const email = req.session.user.email;
     const user = await User.findOne({ email });
     auth.setCredentials({ refresh_token: user.refreshToken });
     google.options({ auth });

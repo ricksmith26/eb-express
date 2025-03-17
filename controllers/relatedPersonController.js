@@ -82,7 +82,7 @@ const RelatedPersonController = {
 
   async getRelatedPersonsByPatientEmailForAI(req, res) {
     try {
-      const  email  = req.cookies.email; // Get email from cookie
+      const  email  = req.user.email; // Get email from cookie
       // ✅ Find patient by checking for an email inside the telecom array
       const patient = await Patient.findOne({
         telecom: {
@@ -119,11 +119,14 @@ const RelatedPersonController = {
   },
   async getRelatedPersonsByPatientEmail(req, res) {
     try {
-      const  email  = req.cookies.email; // Get email from cookie
+      console.log("Session Data:", req.session.user.email); // ✅ Debugging: Check if session exists
+      console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
+      const {email} = req.param;; // Get email from cookie
+      console.log(email, '<<<EMAIL')
       // ✅ Find patient by checking for an email inside the telecom array
       const patient = await Patient.findOne({
         telecom: {
-          $elemMatch: { system: "email", value: email }, // Ensures email match
+          $elemMatch: { system: "email", value: req.session.user.email }, // Ensures email match
         },
       });
 

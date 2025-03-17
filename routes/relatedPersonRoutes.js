@@ -4,7 +4,7 @@ import RelatedPersonController from "../controllers/relatedPersonController.js";
 const router = express.Router();
 
 router.get("/email/ai", RelatedPersonController.getRelatedPersonsByPatientEmailForAI);
-router.get("/email", RelatedPersonController.getRelatedPersonsByPatientEmail);
+router.get("/getByEmail", RelatedPersonController.getRelatedPersonsByPatientEmail);
 router.post("/", RelatedPersonController.createRelatedPerson);
 router.get("/:id", RelatedPersonController.getRelatedPerson);
 router.put("/:id", RelatedPersonController.updateRelatedPerson);
