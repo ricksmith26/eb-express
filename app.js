@@ -19,6 +19,7 @@ import session from "express-session"
 import "./config/passport.js";
 import "./instrument.js";
 import * as Sentry from "@sentry/node";
+// import cookieSession from 'cookie-session'
 
 
 const app = express();
@@ -40,6 +41,10 @@ app.use(
   })
 );
 
+// app.use(cookieSession({
+//   name: 'session',
+//   keys: ['email', 'auth_token']
+// }))
 
 // ✅ 2. JSON Parsing Middleware
 app.use(express.json());
@@ -47,26 +52,30 @@ app.use(express.urlencoded({ extended: true }));
 
 // ✅ 3. Session Middleware (After CORS)
 console.log(`🔍 Connecting to MongoDB for sessions at: ${process.env.MONGO_DB_URL}`);
+app.use((req, res, next) => {
+  console.error("📝 PRE Session Middleware Debug: ", req.session);
+  next();
+});
 
 app.use(session({
   secret: process.env.JWT_SECRET || "default-secret",
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGO_DB_URL,
-    collectionName: "sessions",
-  }),
-  cookie: {
-    maxAge: 24 * 60 * 60 * 1000, // 1 day expiration
-    httpOnly: true, // Prevent JavaScript access
-    secure: process.env.NODE_ENV === "production", // Use HTTPS only in production
-    // sameSite: "None", // Required for cross-site authentication
-    path: "/", // Cookie accessible across the entire site
-  },
+  // store: MongoStore.create({
+  //   mongoUrl: process.env.MONGO_DB_URL,
+  //   collectionName: "sessions",
+  // }),
+  // cookie: {
+  //   maxAge: 24 * 60 * 60 * 1000, // 1 day expiration
+  //   httpOnly: true, // Prevent JavaScript access
+  //   secure: process.env.NODE_ENV === "production", // Use HTTPS only in production
+  //   // sameSite: "None", // Required for cross-site authentication
+  //   path: "/", // Cookie accessible across the entire site
+  // },
 }));
 
 app.use((req, res, next) => {
-  console.log("📝 Session Middleware Debug: ", req.session);
+  console.error("📝Session Middleware Debug: ", req.session);
   next();
 });
 

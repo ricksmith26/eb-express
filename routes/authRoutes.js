@@ -91,8 +91,8 @@ router.get("/logout", (req, res) => {
 router.get("/me", async (req, res) => {
   // console.log("Session Data:", req.session); // ✅ Debugging: Check if session exists
   // console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
-  const {email} = req.params;
-  console.log(req.params, '<<<<<<req.param', req.session.passport.user)
+  // const {email} = req.params;
+  // console.log(req.session, '<<<<<<req.param')
   try {
     if (!req?.session?.passport?.user) {
       return res.status(401).json({ error: "User not authenticated" });
