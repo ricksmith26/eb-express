@@ -1,5 +1,6 @@
 import RelatedPerson from "../models/RelatedPerson.js";
 import Patient from "../models/PatientSchema.js";
+import { jwtDecode } from "jwt-decode";
 
 
 const RelatedPersonController = {
@@ -119,14 +120,13 @@ const RelatedPersonController = {
   },
   async getRelatedPersonsByPatientEmail(req, res) {
     try {
-      console.log("Session Data:", req.session.user.email); // ✅ Debugging: Check if session exists
-      console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
-      const {email} = req.param;; // Get email from cookie
-      console.log(email, '<<<EMAIL')
-      // ✅ Find patient by checking for an email inside the telecom array
+      // console.log("Session Data:", req.session.user.email); // ✅ Debugging: Check if session exists
+      // console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
+      console.log(req.headers ,'<<<<<req.headers')
+      const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
       const patient = await Patient.findOne({
         telecom: {
-          $elemMatch: { system: "email", value: req.session.user.email }, // Ensures email match
+          $elemMatch: { system: "email", value: decoded.email }, // Ensures email match
         },
       });
 
@@ -151,8 +151,6 @@ const RelatedPersonController = {
       res.status(500).json({ error: error.message });
     }
   }
-
-
 };
 
 

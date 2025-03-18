@@ -20,6 +20,8 @@ import "./config/passport.js";
 import "./instrument.js";
 import * as Sentry from "@sentry/node";
 // import cookieSession from 'cookie-session'
+import dotenv from "dotenv";
+dotenv.config();
 
 
 const app = express();
@@ -62,17 +64,10 @@ app.use(session({
   secret: process.env.JWT_SECRET || "default-secret",
   resave: false,
   saveUninitialized: false,
-  // store: MongoStore.create({
-  //   mongoUrl: process.env.MONGO_DB_URL,
-  //   collectionName: "sessions",
-  // }),
-  // cookie: {
-  //   maxAge: 24 * 60 * 60 * 1000, // 1 day expiration
-  //   httpOnly: true, // Prevent JavaScript access
-  //   secure: process.env.NODE_ENV === "production", // Use HTTPS only in production
-  //   // sameSite: "None", // Required for cross-site authentication
-  //   path: "/", // Cookie accessible across the entire site
-  // },
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_DB_URL,
+    collectionName: "sessions",
+  })
 }));
 
 app.use((req, res, next) => {

@@ -1,4 +1,5 @@
 import Patient from '../models/PatientSchema.js';
+import { jwtDecode } from "jwt-decode";
 
 const PatientController = {
 
@@ -39,8 +40,8 @@ const PatientController = {
 
     async getPatientByEmail(req, res) {
         try {
-
-            const { email } = req.cookies; // ✅ Get email from cookie
+            const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
+            const  email  = decoded.email; // ✅ Get email from cookie
 
             if (!email) {
                 return res.status(400).json({ error: "Email is required" });

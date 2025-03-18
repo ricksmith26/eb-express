@@ -2,7 +2,8 @@ import express from "express";
 import { google } from "googleapis";
 import User from '../models/User.js'
 import {API_URL} from '../config/vars.js'
-import {GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET} from '../config/vars.js';
+import { jwtDecode } from "jwt-decode";
+
 const router = express.Router();
 
 const auth = new google.auth.OAuth2(
@@ -13,7 +14,7 @@ const auth = new google.auth.OAuth2(
 
 // Route to get LiveKit connection details
 router.get("/image/:fileId/:email", async (req, res) => {
-    console.log(req.session, '<<<req.session')
+    // const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
     const email = req.params.email;
     const user = await User.findOne({ email });
     auth.setCredentials({ refresh_token: user.refreshToken });
@@ -35,7 +36,8 @@ router.get("/image/:fileId/:email", async (req, res) => {
 });
 
 router.get("/all", async (req, res) => {
-    const email = req.session.user.email;
+    const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
+    const email = decoded.email;
     const user = await User.findOne({ email });
     auth.setCredentials({ refresh_token: user.refreshToken });
     google.options({ auth });

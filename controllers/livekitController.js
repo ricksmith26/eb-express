@@ -46,7 +46,6 @@ export const getConnectionDetails = async (req, res) => {
 
 const createParticipantToken = async (userInfo, roomName) => {
   try {
-    console.log(userInfo)
     const email = userInfo.email; // ✅ Extract email from userInfo object
 
     if (!email) {
