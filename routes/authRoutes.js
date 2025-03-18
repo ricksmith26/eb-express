@@ -57,6 +57,7 @@ router.get("/google/callback", (req, res, next) => {
 
       // ✅ Store user in session manually
       req.session.user = user;
+      // req.session.cookie.user = user;
       req.email = user.email;
       console.log("✅ Stored user in session:", req.session.user);
       // ✅ Generate JWT Token
@@ -73,7 +74,6 @@ router.get("/google/callback", (req, res, next) => {
         maxAge: 24 * 60 * 60 * 1000, // 1-day expiration
         path: "/", // Available across all routes
       });
-
       res.redirect(process.env.FRONTEND_URL);
     });
   })(req, res, next);
@@ -95,7 +95,7 @@ router.get("/me", async (req, res) => {
   // console.log(req.session, '<<<<<<req.param')
   try {
     if (!req?.session?.passport?.user) {
-      return res.status(401).json({ error: "User not authenticated" });
+      throw res.status(401).json({ error: "User not authenticated" });
     }
 
     // ✅ Get user from MongoDB using session user ID

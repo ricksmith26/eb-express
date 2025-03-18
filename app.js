@@ -33,13 +33,14 @@ const io = new Server(server, {
 // import MongoStore from "connect-mongo";
 
 app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse proxies
-console.log(process.env.MONGO_DB_URL, '<<process.env.MONGO_DB_URL')
 app.use(
   cors({
     origin: process.env.FRONTEND_URL, // Ensure this matches your frontend URL
     credentials: true, // Allow cookies
   })
 );
+
+
 
 // app.use(cookieSession({
 //   name: 'session',
@@ -79,7 +80,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// app.use(passport.authenticate('session'));
+
+app.use(passport.authenticate('session'));
 app.use(passport.initialize());
 
 app.use(logger('dev'));
