@@ -10,6 +10,7 @@ import usersRouter from './routes/users.js';
 import patientsRouter from './routes/patientsRouter.js';
 import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import calendarRoutes from "./routes/calendarRoutes.js";
 import livekitRoutes from './routes/livekitRoutes.js';
 import imagesRouter from './routes/imagesRoutes.js';
 import connectDB from './config/db.js';
@@ -94,6 +95,7 @@ app.use('/users', usersRouter);
 app.use("/relatedPerson", relatedPersonRoutes);
 app.use("/images", imagesRouter)
 app.use("/api/livekit", livekitRoutes);
+app.use("/calendar", calendarRoutes);
 
 Sentry.setupExpressErrorHandler(app);
 
