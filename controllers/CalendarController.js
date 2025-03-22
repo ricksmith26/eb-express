@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import dotenv from "dotenv";
+import User from '../models/User.js'
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ const CalendarController = {
         const events = await this.getCalendarEvents(accessToken, startOfDay, endOfDay);
         res.json(events);
       } catch (error) {
+        console.log(error)
         res.status(500).json({ error: "Failed to fetch today's calendar events" });
       }
     },
