@@ -1,8 +1,25 @@
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import User from '../models/User.js'
-
+import TokenController from './TokenController.js'
 dotenv.config();
+
+const  getCalendarEvents = async(accessToken, timeMin, timeMax) => {
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+  
+    const calendar = google.calendar({ version: "v3", auth });
+  
+    const response = await calendar.events.list({
+      calendarId: "primary",
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: "startTime",
+    });
+  
+    return response.data.items;
+  }
 
 const CalendarController = {
     async getTodaysEvents(req, res) {
@@ -17,14 +34,14 @@ const CalendarController = {
     
         // ✅ Refresh token if accessToken has expired
         if (user.refreshToken) {
-          accessToken = await this.refreshAccessToken(user) || user.accessToken;
+          accessToken = await TokenController.refreshAccessToken(user) || user.accessToken;
         }
     
         const now = new Date();
         const startOfDay = new Date(now.setHours(0, 0, 0, 0)).toISOString();
         const endOfDay = new Date(now.setHours(23, 59, 59, 999)).toISOString();
     
-        const events = await this.getCalendarEvents(accessToken, startOfDay, endOfDay);
+        const events = await getCalendarEvents(accessToken, startOfDay, endOfDay);
         res.json(events);
       } catch (error) {
         console.log(error)
@@ -43,7 +60,7 @@ const CalendarController = {
     
         // ✅ Refresh token if accessToken has expired
         if (user.refreshToken) {
-          accessToken = await this.refreshAccessToken(user) || user.accessToken;
+          accessToken = await TokenController.refreshAccessToken(user) || user.accessToken;
         }
     
         const now = new Date();
@@ -71,28 +88,6 @@ const CalendarController = {
         });
       
         return response.data.items;
-      },
-      async refreshAccessToken(user) {
-        try {
-          const auth = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_CALLBACK_URL
-          );
-      
-          auth.setCredentials({ refresh_token: user.refreshToken });
-      
-          const { credentials } = await auth.refreshAccessToken(); // ✅ Get new access token
-      
-          // ✅ Update user with new token
-          user.accessToken = credentials.access_token;
-          await user.save();
-      
-          return credentials.access_token;
-        } catch (error) {
-          console.error("Failed to refresh access token:", error);
-          return null;
-        }
       }
 }
 
