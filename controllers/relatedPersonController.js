@@ -83,7 +83,7 @@ const RelatedPersonController = {
 
   async getRelatedPersonsByPatientEmailForAI(req, res) {
     try {
-      const  email  = req.user.email; // Get email from cookie
+      const  email  = req.cookies.email; // Get email from cookie
       // ✅ Find patient by checking for an email inside the telecom array
       const patient = await Patient.findOne({
         telecom: {
