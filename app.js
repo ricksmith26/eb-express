@@ -23,6 +23,7 @@ import * as Sentry from "@sentry/node";
 // import cookieSession from 'cookie-session'
 import dotenv from "dotenv";
 import {dotEnvConfig} from './config/vars.js'
+import expressListEndpoints from "express-list-endpoints";
 dotenv.config(dotEnvConfig);
 
 
@@ -89,7 +90,6 @@ app.use(cookieParser());
 connectDB();
 
 app.use('/', indexRouter);
-
 app.use("/auth", authRoutes);
 app.use('/patients', patientsRouter);
 app.use('/users', usersRouter);
@@ -98,7 +98,6 @@ app.use("/images", imagesRouter)
 app.use("/api/livekit", livekitRoutes);
 app.use("/calendar", calendarRoutes);
 
-Sentry.setupExpressErrorHandler(app);
 
 const users = new Map();
 io.on('connection', (socket) => {
@@ -174,6 +173,7 @@ io.on('connection', (socket) => {
   });
 });
 
+
 app.post('/send-webrtc-message', (req, res) => {
   const { toEmail, fromEmail, message } = req.body;
 
@@ -201,6 +201,11 @@ function getUserEmail(socketId) {
   return null;
 }
 
+const endpoints = expressListEndpoints(app);
+
+
+console.log(endpoints);
+Sentry.setupExpressErrorHandler(app);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
