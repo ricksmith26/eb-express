@@ -22,7 +22,8 @@ import "./instrument.js";
 import * as Sentry from "@sentry/node";
 // import cookieSession from 'cookie-session'
 import dotenv from "dotenv";
-dotenv.config();
+import {dotEnvConfig} from './config/vars.js'
+dotenv.config(dotEnvConfig);
 
 
 const app = express();

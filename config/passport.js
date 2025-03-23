@@ -7,31 +7,46 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL,
-      passReqToCallback: true, // ✅ Ensures full control over request
+      callbackURL: `${process.env.API_URL}/auth/google/callback`,
     },
-    async (request, accessToken, refreshToken, profile, done) => {
-      console.error(profile, '<><><><><>profile<<<<<<<')
+    async (accessToken, refreshToken, profile, done) => {
       try {
         let user = await User.findOne({ googleId: profile.id });
+        console.log(user, '<<<<<<<<<<<<<<<< USER')
+        if (user) {
+          let updated = false;
 
-        if (!user) {
-          user = new User({
-            googleId: profile.id,
-            email: profile.emails[0].value,
-            name: profile.displayName,
-            picture: profile.photos[0].value,
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          });
-          await user.save();
+          // ✅ Update tokens if they have changed
+          if (accessToken && user.accessToken !== accessToken) {
+            user.accessToken = accessToken;
+            updated = true;
+          }
+
+          if (refreshToken && user.refreshToken !== refreshToken) {
+            user.refreshToken = refreshToken;
+            updated = true;
+          }
+
+          if (updated) {
+            await user.save();
+            console.log("🔁 Updated user tokens");
+          }
+
+          return done(null, user);
         }
 
-        console.log("✅ User authenticated, passing to serializeUser:", user);
+        // ✅ Create new user
+        user = await User.create({
+          googleId: profile.id,
+          email: profile.emails[0].value,
+          accessToken,
+          refreshToken,
+        });
 
+        console.log("✅ Created new user with tokens");
         return done(null, user);
-      } catch (error) {
-        return done(error, null);
+      } catch (err) {
+        return done(err, null);
       }
     }
   )

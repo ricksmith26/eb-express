@@ -17,7 +17,7 @@ echo "🔄 Restarting app on EC2..."
 ssh -i $PEM_KEY $EC2_USER@$EC2_IP <<EOF
   cd $APP_DIR
   npm install --production
-  pm2 restart eb-express || pm2 start server.js --name "eb-express"
+ 
   exit
 EOF
 

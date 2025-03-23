@@ -2,8 +2,8 @@ import { AccessToken } from "livekit-server-sdk";
 import dotenv from "dotenv";
 import Participant from "../models/Participant.js";
 import User from "../models/User.js";
-
-dotenv.config();
+import {dotEnvConfig} from '../config/vars.js'
+dotenv.config(dotEnvConfig);
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;

@@ -7,8 +7,9 @@
 // const app = require('../app');
 import server from '../app.js';
 import debugLib from 'debug';
+import {dotEnvConfig} from '../config/vars.js';
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config(dotEnvConfig);
 const debug = debugLib('eb-express:server');
 
 

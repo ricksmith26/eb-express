@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-dotenv.config();
+export const dotEnvConfig = {path: '.env.local'}
+dotenv.config(dotEnvConfig);
 export const {
     MONGO_DB_URL,
     API_URL,

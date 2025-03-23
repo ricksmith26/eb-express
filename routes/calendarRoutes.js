@@ -3,8 +3,8 @@ import { google } from "googleapis";
 import User from "../models/User.js";
 import dotenv from "dotenv";
 import CalendarController from '../controllers/CalendarController.js'
-
-dotenv.config();
+import {dotEnvConfig} from '../config/vars.js'
+dotenv.config(dotEnvConfig);
 
 const router = express.Router();
 

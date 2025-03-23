@@ -5,9 +5,10 @@ import User from '../models/User.js'
 import { FRONTEND_URL } from '../config/vars.js'
 import jwt from "jsonwebtoken";
 import { jwtDecode } from "jwt-decode";
+import {dotEnvConfig} from '../config/vars.js'
 // import Patient from '../models/PatientSchema'
 
-dotenv.config();
+dotenv.config(dotEnvConfig);
 
 const router = express.Router();
 
@@ -81,6 +82,7 @@ router.get("/google/callback", (req, res, next) => {
       res.setHeader("Authorization", `Bearer ${token}`);
 
       // ✅ Redirect user to frontend with token in URL (optional)
+      // console.log(`${process.env.FRONTEND_URL}/?token=${token}`)
       res.redirect(`${process.env.FRONTEND_URL}/?token=${token}`);
     });
   })(req, res, next);

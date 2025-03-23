@@ -2,7 +2,8 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 import User from '../models/User.js'
 import TokenController from './TokenController.js'
-dotenv.config();
+import {dotEnvConfig} from '../config/vars.js'
+dotenv.config(dotEnvConfig);
 
 const  getCalendarEvents = async(accessToken, timeMin, timeMax) => {
     const auth = new google.auth.OAuth2();
