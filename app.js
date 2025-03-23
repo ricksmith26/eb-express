@@ -174,6 +174,26 @@ io.on('connection', (socket) => {
   });
 });
 
+app.post('/send-webrtc-message', (req, res) => {
+  const { toEmail, fromEmail, message } = req.body;
+
+  if (!toEmail || !message) {
+    return res.status(400).json({ error: 'toEmail and message are required' });
+  }
+  console.log(console.log(`ATTEMPTING WebRTC message sent to ${toEmail}`))
+  const recipientSocketId = users.get(toEmail);
+  const callerSocketId = users.get(fromEmail)
+  if (recipientSocketId) {
+    io.to(recipientSocketId).emit('message', { type: 'WEBRTC', message });
+    io.to(callerSocketId).emit('message', { type: 'WEBRTC', message, toEmail });
+    console.log(`WebRTC message sent to ${toEmail}`);
+    return res.json({ success: true, message: 'Message sent' });
+  } else {
+    console.log(`User ${toEmail} is not connected`);
+    return res.status(404).json({ error: 'User is not connected' });
+  }
+});
+
 function getUserEmail(socketId) {
   for (const [email, id] of users.entries()) {
     if (id === socketId) return email;
