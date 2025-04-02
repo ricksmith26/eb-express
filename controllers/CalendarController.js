@@ -68,9 +68,10 @@ const CalendarController = {
         const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).toISOString();
         const endOfWeek = new Date(now.setDate(now.getDate() + (6 - now.getDay()))).toISOString();
     
-        const events = await this.getCalendarEvents(accessToken, startOfWeek, endOfWeek);
+        const events = await getCalendarEvents(accessToken, startOfWeek, endOfWeek);
         res.json(events);
       } catch (error) {
+        console.log(error, "<<<<<<<<<<")
         res.status(500).json({ error: "Failed to fetch this week's calendar events" });
       }
     },

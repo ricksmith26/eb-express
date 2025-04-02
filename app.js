@@ -12,6 +12,7 @@ import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
 import livekitRoutes from './routes/livekitRoutes.js';
+import webRTCRoutes from './routes/webRTCRoutes.js'
 import imagesRouter from './routes/imagesRoutes.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
@@ -24,12 +25,13 @@ import * as Sentry from "@sentry/node";
 import dotenv from "dotenv";
 import {dotEnvConfig} from './config/vars.js'
 import expressListEndpoints from "express-list-endpoints";
+import {socketInit, users} from './socketIo/socketIo.js'
 dotenv.config(dotEnvConfig);
 
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {
+export const io = new Server(server, {
   cors: {
     origin: "*"
   }
@@ -98,101 +100,9 @@ app.use("/images", imagesRouter)
 app.use("/api/livekit", livekitRoutes);
 app.use("/calendar", calendarRoutes);
 
+socketInit(io)
 
-const users = new Map();
-io.on('connection', (socket) => {
-  console.log(`⚡: ${socket.id} user just connected!`);
-
-  socket.on('register', (email) => {
-    users.set(email, socket.id);
-    console.log(`User registered: ${email} -> ${socket.id}`);
-  });
-
-  // Handle private messages
-  socket.on('privateMessage', ({ toEmail, message, type }) => {
-    console.log({ toEmail, message, type })
-    const recipientSocketId = users.get(toEmail);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit('message', { type, message });
-      console.log(`Message sent to ${toEmail}`);
-    } else {
-      console.log(`User ${toEmail} is not connected`);
-    }
-  });
-
-  socket.on("callUser", ({ toEmail, offer }) => {
-    const recipientSocketId = users.get(toEmail);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("offer", { from: getUserEmail(socket.id), offer });
-    }
-  });
-
-  socket.on("acceptCall", ({ from }) => {
-    const recipientSocketId = users.get(from);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("callAccepted", { from: getUserEmail(socket.id) });
-    }
-  });
-
-  socket.on("hangup", ({ toEmail }) => {
-    const recipientSocketId = users.get(toEmail);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("hangup", toEmail);
-      console.log(`Call hangup event sent to ${toEmail}`);
-    } else {
-      console.log(`User ${toEmail} is not connected.`);
-    }
-  });
-
-  socket.on("answer", ({ to, answer }) => {
-    const recipientSocketId = users.get(to);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("answer", { answer });
-    }
-  });
-
-  socket.on("iceCandidate", ({ to, candidate }) => {
-    const recipientSocketId = users.get(to);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("iceCandidate", { candidate });
-    }
-  });
-
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    for (const [email, id] of users.entries()) {
-      if (id === socket.id) {
-        users.delete(email);
-        console.log(`User disconnected: ${email}`);
-        break;
-      }
-    }
-  });
-  socket.on("message", (message) => {
-    socket.broadcast.emit("message", message);
-  });
-});
-
-
-app.post('/send-webrtc-message', (req, res) => {
-  const { toEmail, fromEmail, message } = req.body;
-
-  if (!toEmail || !message) {
-    return res.status(400).json({ error: 'toEmail and message are required' });
-  }
-  console.log(console.log(`ATTEMPTING WebRTC message sent to ${toEmail}`))
-  const recipientSocketId = users.get(toEmail);
-  const callerSocketId = users.get(fromEmail)
-  if (recipientSocketId) {
-    io.to(recipientSocketId).emit('message', { type: 'WEBRTC', message });
-    io.to(callerSocketId).emit('message', { type: 'WEBRTC', message, toEmail });
-    console.log(`WebRTC message sent to ${toEmail}`);
-    return res.json({ success: true, message: 'Message sent' });
-  } else {
-    console.log(`User ${toEmail} is not connected`);
-    return res.status(404).json({ error: 'User is not connected' });
-  }
-});
+app.use('/send-webrtc-message', webRTCRoutes);
 
 function getUserEmail(socketId) {
   for (const [email, id] of users.entries()) {
