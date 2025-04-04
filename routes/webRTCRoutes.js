@@ -5,5 +5,6 @@ const router = express.Router();
 
 // Route to get LiveKit connection details
 router.post("/", WebRTCController.sendWebRTCReq);
+router.post("/emergencyCall", WebRTCController.emergencyCallReq);
 
 export default router;

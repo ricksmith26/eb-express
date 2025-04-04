@@ -24,7 +24,18 @@ export const WebRTCController = {
             }
         } catch (error) {
             console.log(error)
+            throw error
         }
-
+    },
+    async emergencyCallReq(req, res ) {
+        const { toEmail } = req.body;
+        try {
+            const recipientSocketId = users.get(toEmail);
+            io.to(recipientSocketId).emit('emergencyCall');
+            console.log(`Emergency Call message sent to ${toEmail}`);
+            return res.json({ success: true, message: 'Message sent' });
+        } catch (error){
+            throw error
+        }
     }
 }

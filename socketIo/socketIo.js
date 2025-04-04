@@ -8,6 +8,7 @@ import answer from './events/answer.js'
 import iceCandidate from './events/iceCandidate.js';
 import disconnect from './events/disconnect.js'
 import message from './events/message.js'
+import emergencyCall from './events/emergencyCall.js'
 export const users = new Map();
 
 
@@ -40,5 +41,7 @@ export const socketInit = (io) => {
       disconnect(socket, users)
 
       message(socket, users)
+
+      emergencyCall(socket, users, io)
     });
 }
