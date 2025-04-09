@@ -15,6 +15,7 @@ const TokenController = {
           
               // ✅ Update user with new token
               user.accessToken = credentials.access_token;
+              user.refreshToken = credentials.refresh_token;
               await user.save();
           
               return credentials.access_token;

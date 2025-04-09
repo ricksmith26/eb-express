@@ -1,12 +1,29 @@
 import express from "express";
-import PatientController from "../controllers/PatientController.js"; // ✅ Import controller
+import dotenv from "dotenv";
+import PatientController from "../controllers/PatientController.js";
+import { dotEnvConfig } from "../config/vars.js";
 
-const router = express.Router();
+dotenv.config(dotEnvConfig);
 
-router.get("/email", PatientController.getPatientByEmail); 
-router.get("/", PatientController.getPatients); 
-router.post("/", PatientController.createPatient);
-router.put("/:id", PatientController.updatePatient);
-router.delete("/:id", PatientController.deletePatient);
+class PatientRoutes {
+  constructor() {
+    this.router = express.Router();
+    this.controller = PatientController;
 
-export default router;
+    this.initializeRoutes();
+  }
+
+  initializeRoutes() {
+    this.router.get("/email", this.controller.getPatientByEmail); 
+    this.router.get("/", this.controller.getPatients); 
+    this.router.post("/", this.controller.createPatient);
+    this.router.put("/:id", this.controller.updatePatient);
+    this.router.delete("/:id", this.controller.deletePatient);
+  }
+
+  getRouter() {
+    return this.router;
+  }
+}
+
+export default new PatientRoutes().getRouter();

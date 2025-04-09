@@ -1,15 +1,31 @@
 import express from "express";
+import dotenv from "dotenv";
 import RelatedPersonController from "../controllers/RelatedPersonController.js";
+import { dotEnvConfig } from "../config/vars.js";
 
-const router = express.Router();
+dotenv.config(dotEnvConfig);
 
-router.get("/email/ai", RelatedPersonController.getRelatedPersonsByPatientEmailForAI);
-router.get("/getByEmail", RelatedPersonController.getRelatedPersonsByPatientEmail);
-router.post("/", RelatedPersonController.createRelatedPerson);
-router.get("/:id", RelatedPersonController.getRelatedPerson);
-router.put("/:id", RelatedPersonController.updateRelatedPerson);
-router.delete("/:id", RelatedPersonController.deleteRelatedPerson);
-router.get("/", RelatedPersonController.getAllRelatedPersons);
+class RelatedPersonRoutes {
+  constructor() {
+    this.router = express.Router();
+    this.controller = RelatedPersonController;
 
+    this.initializeRoutes();
+  }
 
-export default router;
+  initializeRoutes() {
+    this.router.get("/email/ai", this.controller.getRelatedPersonsByPatientEmailForAI);
+    this.router.get("/getByEmail", this.controller.getRelatedPersonsByPatientEmail);
+    this.router.post("/", this.controller.createRelatedPerson);
+    this.router.get("/:id", this.controller.getRelatedPerson);
+    this.router.put("/:id", this.controller.updateRelatedPerson);
+    this.router.delete("/:id", this.controller.deleteRelatedPerson);
+    this.router.get("/", this.controller.getAllRelatedPersons);
+  }
+
+  getRouter() {
+    return this.router;
+  }
+}
+
+export default new RelatedPersonRoutes().getRouter();

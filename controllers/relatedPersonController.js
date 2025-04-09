@@ -2,19 +2,26 @@ import RelatedPerson from "../models/RelatedPerson.js";
 import Patient from "../models/PatientSchema.js";
 import { jwtDecode } from "jwt-decode";
 
+class RelatedPersonController {
+  constructor() {
+    this.createRelatedPerson = this.createRelatedPerson.bind(this);
+    this.getRelatedPerson = this.getRelatedPerson.bind(this);
+    this.updateRelatedPerson = this.updateRelatedPerson.bind(this);
+    this.deleteRelatedPerson = this.deleteRelatedPerson.bind(this);
+    this.getAllRelatedPersons = this.getAllRelatedPersons.bind(this);
+    this.getRelatedPersonsByPatientEmailForAI = this.getRelatedPersonsByPatientEmailForAI.bind(this);
+    this.getRelatedPersonsByPatientEmail = this.getRelatedPersonsByPatientEmail.bind(this);
+  }
 
-const RelatedPersonController = {
-  // Create a new RelatedPerson
   async createRelatedPerson(req, res) {
     try {
-      const relatedPerson = RelatedPerson.insertMany(req.body);
+      const relatedPerson = await RelatedPerson.insertMany(req.body);
       res.status(201).json(relatedPerson);
     } catch (error) {
       res.status(400).json({ error: error.message });
     }
-  },
+  }
 
-  // Get a single RelatedPerson by ID
   async getRelatedPerson(req, res) {
     try {
       const relatedPerson = await RelatedPerson.findById(req.params.id);
@@ -25,9 +32,8 @@ const RelatedPersonController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  },
+  }
 
-  // Update a RelatedPerson by ID
   async updateRelatedPerson(req, res) {
     try {
       const updatedRelatedPerson = await RelatedPerson.findByIdAndUpdate(
@@ -42,9 +48,8 @@ const RelatedPersonController = {
     } catch (error) {
       res.status(400).json({ error: error.message });
     }
-  },
+  }
 
-  // Delete a RelatedPerson by ID
   async deleteRelatedPerson(req, res) {
     try {
       const deletedRelatedPerson = await RelatedPerson.findByIdAndDelete(req.params.id);
@@ -55,106 +60,67 @@ const RelatedPersonController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  },
+  }
 
-  // Get all RelatedPersons
-  async getAllRelatedPersons(req, res) {
-    try {
-      const relatedPersons = await RelatedPerson.find();
-      res.json(relatedPersons);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
   async getAllRelatedPersons(req, res) {
     try {
       const query = {};
-      
       if (req.query.patient) {
         query["patient.reference"] = req.query.patient;
       }
-  
       const relatedPersons = await RelatedPerson.find(query);
       res.json(relatedPersons);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  },
+  }
 
   async getRelatedPersonsByPatientEmailForAI(req, res) {
     try {
-      const  email  = req.cookies.email; // Get email from cookie
-      // ✅ Find patient by checking for an email inside the telecom array
+      const email = req.cookies.email;
       const patient = await Patient.findOne({
-        telecom: {
-          $elemMatch: { system: "email", value: email }, // Ensures email match
-        },
+        telecom: { $elemMatch: { system: "email", value: email } }
       });
 
-      
-    //   console.log("🔍 Found Patient:", patient);
-  
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
-  
-      // ✅ Ensure correct patient reference format
+
       const patientReference = `Patient/${patient._id}`;
-  
-      console.log("🔗 Searching RelatedPersons with patient reference:", patientReference);
-  
-      // ✅ Find all related persons linked to this patient
       const relatedPersons = await RelatedPerson.find({ "patient.reference": patientReference });
-      const contacts = relatedPersons.map((person) => {
-        return {
-            name: `${person.name[0].given[0]} ${person.name[0].family}`,
-            email: `${person.telecom[1].value}`
-        }
-      })
-      console.log(contacts, '<<contacts')
+
+      const contacts = relatedPersons.map((person) => ({
+        name: `${person.name[0].given[0]} ${person.name[0].family}`,
+        email: `${person.telecom[1].value}`
+      }));
+
       res.json(JSON.stringify(contacts));
     } catch (error) {
-      console.error("🚨 Error fetching related persons:", error);
+      console.error("🚨 Error fetching related persons for AI:", error);
       res.status(500).json({ error: error.message });
     }
-  },
+  }
+
   async getRelatedPersonsByPatientEmail(req, res) {
     try {
-      // console.log("Session Data:", req.session.user.email); // ✅ Debugging: Check if session exists
-      // console.log("Session User:", req.user); // ✅ Debugging: Check if Passport sets `req.user`
-      console.log(req.headers ,'<<<<<req.headers')
       const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
       const patient = await Patient.findOne({
-        telecom: {
-          $elemMatch: { system: "email", value: decoded.email }, // Ensures email match
-        },
+        telecom: { $elemMatch: { system: "email", value: decoded.email } }
       });
 
-      
-    //   console.log("🔍 Found Patient:", patient);
-  
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
-  
-      // ✅ Ensure correct patient reference format
+
       const patientReference = `Patient/${patient._id}`;
-  
-      console.log("🔗 Searching RelatedPersons with patient reference:", patientReference);
-  
-      // ✅ Find all related persons linked to this patient
       const relatedPersons = await RelatedPerson.find({ "patient.reference": patientReference });
-  
+
       res.json(relatedPersons);
     } catch (error) {
       console.error("🚨 Error fetching related persons:", error);
       res.status(500).json({ error: error.message });
     }
   }
-};
+}
 
-
-
-
-
-export default RelatedPersonController;
+export default new RelatedPersonController();

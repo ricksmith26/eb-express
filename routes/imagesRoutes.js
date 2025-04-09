@@ -1,18 +1,29 @@
 import express from "express";
-import { google } from "googleapis";
-import {getAllImages, getImage} from '../controllers/imagesController.js'
+import dotenv from "dotenv";
+import ImagesController from "../controllers/ImagesController.js"; // make sure the filename matches
+import { dotEnvConfig } from "../config/vars.js";
 
-const router = express.Router();
+dotenv.config(dotEnvConfig);
 
-const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    "urn:ietf:wg:oauth:2.0:oob" // Use "oob" for refresh tokens
-  );
+class ImagesRoutes {
+  constructor() {
+    this.router = express.Router();
+    this.imagesController = ImagesController; // Assumes a singleton export
 
-// Route to get LiveKit connection details
-router.get("/image/:fileId/:email", getImage);
+    this.initializeRoutes();
+  }
 
-router.get("/all", getAllImages);
+  initializeRoutes() {
+    // ✅ Get a single image by file ID and user email
+    this.router.get("/image/:fileId/:email", this.imagesController.getImage);
 
-export default router;
+    // ✅ Get all images for authenticated user
+    this.router.get("/all", this.imagesController.getAllImages);
+  }
+
+  getRouter() {
+    return this.router;
+  }
+}
+
+export default new ImagesRoutes().getRouter();

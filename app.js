@@ -7,13 +7,14 @@ import logger from 'morgan';
 import cors from "cors";
 import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
-import patientsRouter from './routes/patientsRouter.js';
-import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
+import patientsRouter from './routes/PatientsRouter.js';
+import relatedPersonRoutes from "./routes/RelatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import calendarRoutes from "./routes/calendarRoutes.js";
-import livekitRoutes from './routes/livekitRoutes.js';
-import webRTCRoutes from './routes/webRTCRoutes.js'
-import imagesRouter from './routes/imagesRoutes.js';
+import calendarRoutes from "./routes/CalendarRoutes.js";
+import livekitRoutes from './routes/LivekitRoutes.js';
+import webRTCRoutes from './routes/WebRTCRoutes.js'
+import imagesRouter from './routes/ImagesRoutes.js';
+import modeRouter from './routes/ModeRoutes.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
 import MongoStore from "connect-mongo";
@@ -26,6 +27,7 @@ import dotenv from "dotenv";
 import {dotEnvConfig} from './config/vars.js'
 import expressListEndpoints from "express-list-endpoints";
 import {socketInit, users} from './socketIo/socketIo.js'
+import {setupAgenda}  from './agenda/agenda.js'
 dotenv.config(dotEnvConfig);
 
 
@@ -99,10 +101,12 @@ app.use("/relatedPerson", relatedPersonRoutes);
 app.use("/images", imagesRouter)
 app.use("/api/livekit", livekitRoutes);
 app.use("/calendar", calendarRoutes);
+app.use("/modes", modeRouter);
 
 socketInit(io)
 
 app.use('/send-webrtc-message', webRTCRoutes);
+setupAgenda()
 
 function getUserEmail(socketId) {
   for (const [email, id] of users.entries()) {

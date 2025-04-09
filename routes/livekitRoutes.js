@@ -1,9 +1,20 @@
 import express from "express";
-import { getConnectionDetails } from "../controllers/livekitController.js";
+import LivekitController from "../controllers/LivekitController.js";
 
-const router = express.Router();
+class LivekitRoutes {
+  constructor() {
+    this.router = express.Router();
+    this.livekitController = LivekitController; // Using LivekitController class instance
+    this.initializeRoutes();
+  }
 
-// Route to get LiveKit connection details
-router.get("/connect/:email", getConnectionDetails);
+  initializeRoutes() {
+    this.router.get("/connect/:email/:message?", this.livekitController.getConnectionDetails);
+  }
 
-export default router;
+  getRouter() {
+    return this.router;
+  }
+}
+
+export default new LivekitRoutes().getRouter();

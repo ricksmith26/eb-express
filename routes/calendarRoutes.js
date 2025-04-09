@@ -1,17 +1,35 @@
 import express from "express";
-import { google } from "googleapis";
-import User from "../models/User.js";
 import dotenv from "dotenv";
-import CalendarController from '../controllers/CalendarController.js'
-import {dotEnvConfig} from '../config/vars.js'
+import CalendarController from "../controllers/CalendarController.js";
+import { dotEnvConfig } from "../config/vars.js";
+
 dotenv.config(dotEnvConfig);
 
-const router = express.Router();
+class CalendarRoutes {
+  constructor() {
+    this.router = express.Router();
+    this.calendarController = CalendarController; // This assumes CalendarController is already a singleton
 
-// ✅ Route: Get Today's Events (Auto Refresh Token)
-router.get("/:email/today",CalendarController.getTodaysEvents);
+    this.initializeRoutes();
+  }
 
-// ✅ Route: Get This Week's Events (Auto Refresh Token)
-router.get("/:email/week", CalendarController.getThisWeeksCalendar);
+  initializeRoutes() {
+    // ✅ Add Event
+    this.router.post("/event", this.calendarController.addEvent);
 
-export default router;
+    // ✅ Events by Specific Date
+    this.router.get("/:email/date", this.calendarController.getEventsByDate);
+
+    // ✅ Today's Events
+    this.router.get("/:email/today", this.calendarController.getTodaysEvents);
+
+    // ✅ This Week's Events
+    this.router.get("/:email/week", this.calendarController.getThisWeeksCalendar);
+  }
+
+  getRouter() {
+    return this.router;
+  }
+}
+
+export default new CalendarRoutes().getRouter();

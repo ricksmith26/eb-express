@@ -1,10 +1,25 @@
 import express from "express";
-import { WebRTCController } from '../controllers/webRTCController.js'
+import WebRTCController from "../controllers/WebRTCController.js";
 
-const router = express.Router();
+class WebRTCRoutes {
+  constructor() {
+    this.router = express.Router();
+    this.controller = WebRTCController;
 
-// Route to get LiveKit connection details
-router.post("/", WebRTCController.sendWebRTCReq);
-router.post("/emergencyCall", WebRTCController.emergencyCallReq);
+    this.initializeRoutes();
+  }
 
-export default router;
+  initializeRoutes() {
+    // 📡 WebRTC Signaling Message
+    this.router.post("/", this.controller.sendWebRTCReq);
+
+    // 🚨 Emergency Call
+    this.router.post("/emergencyCall", this.controller.emergencyCallReq);
+  }
+
+  getRouter() {
+    return this.router;
+  }
+}
+
+export default new WebRTCRoutes().getRouter();
