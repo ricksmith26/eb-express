@@ -13,6 +13,7 @@ class AsteriskRoutes {
     this.router.post("/addAsteriskCredentials", this.controller.addAddAsteriskCredentials)
     this.router.get("/getInactiveAgent", this.controller.getInactiveAgent)
     this.router.get("/getActiveAgentAndInactiveCustomer", this.controller.getActiveAgentAndInactiveCustomer)
+    this.router.patch("/agent/:id/inactive", this.controller.setAgentInactive);
   }
 
   getRouter() {

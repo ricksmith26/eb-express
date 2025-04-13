@@ -7,6 +7,7 @@ class AsteriskController {
     this.addAddAsteriskCredentials = this.addAddAsteriskCredentials.bind(this);
     this.getInactiveAgent = this.getInactiveAgent.bind(this);
     this.getActiveAgentAndInactiveCustomer = this.getActiveAgentAndInactiveCustomer.bind(this);
+    this.setAgentInactive = this.setAgentInactive.bind(this);
   }
 
   async addAddAsteriskCredentials(req, res) {
@@ -64,6 +65,25 @@ class AsteriskController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to swap active agent and inactive customer' });
+    }
+  }
+  async setAgentInactive(req, res) {
+    try {
+      const { id } = req.params;
+  
+      const agent = await AsteriskCredential.findOne({ _id: id, type: 'agent' });
+  
+      if (!agent) {
+        return res.status(404).json({ error: 'Agent not found' });
+      }
+  
+      agent.active = false;
+      await agent.save();
+  
+      res.json({ message: 'Agent set to inactive', agent });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to set agent as inactive' });
     }
   }
 }
