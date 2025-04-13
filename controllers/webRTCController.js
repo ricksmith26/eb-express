@@ -1,11 +1,13 @@
 import { io } from '../app.js';
 import { users } from '../socketIo/socketIo.js';
+import {AsteriskCredential} from '../models/Asterisk.js'
 
 class WebRTCController {
   constructor() {
     // Bind methods to `this` so they retain context in routers
     this.sendWebRTCReq = this.sendWebRTCReq.bind(this);
     this.emergencyCallReq = this.emergencyCallReq.bind(this);
+    this.addAddAsteriskCredentials = this.addAddAsteriskCredentials.bind(this);
   }
 
   async sendWebRTCReq(req, res) {
@@ -46,6 +48,19 @@ class WebRTCController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to send emergency call' });
+    }
+  }
+
+  async addAddAsteriskCredentials(req, res) {
+    try {
+      const credentials = req.body
+  
+      const newCredential = new AsteriskCredential(credentials);
+      await newCredential.save();
+      return res.json(newCredential)
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to addAsteriskCredentials' });
     }
   }
 }

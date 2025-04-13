@@ -14,6 +14,7 @@ import calendarRoutes from "./routes/CalendarRoutes.js";
 import livekitRoutes from './routes/LivekitRoutes.js';
 import webRTCRoutes from './routes/WebRTCRoutes.js'
 import imagesRouter from './routes/ImagesRoutes.js';
+import AsteriskRoutes from './routes/AsteriskRoutes.js';
 import modeRouter from './routes/ModeRoutes.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
@@ -106,6 +107,7 @@ app.use("/modes", modeRouter);
 socketInit(io)
 
 app.use('/send-webrtc-message', webRTCRoutes);
+app.use('/asterisk', AsteriskRoutes);
 setupAgenda()
 
 function getUserEmail(socketId) {

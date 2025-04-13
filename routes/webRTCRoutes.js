@@ -15,6 +15,8 @@ class WebRTCRoutes {
 
     // 🚨 Emergency Call
     this.router.post("/emergencyCall", this.controller.emergencyCallReq);
+
+    this.router.post("/addAsteriskCredentials", this.controller.addAddAsteriskCredentials)
   }
 
   getRouter() {
