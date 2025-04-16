@@ -45,7 +45,8 @@ export const io = new Server(server, {
 app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse proxies
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // Ensure this matches your frontend URL
+    // origin: process.env.FRONTEND_URL, // Ensure this matches your frontend URL
+    origin: '*', // Ensure this matches your frontend URL
     credentials: true, // Allow cookies
   })
 );

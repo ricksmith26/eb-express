@@ -71,6 +71,7 @@ class AuthController {
   async getMe(req, res) {
     try {
       const authHeader = req?.headers?.authorization;
+      console.log(authHeader,'<<<<authHeader')
       if (!authHeader) {
         return res.status(401).json({ error: "User not authenticated" });
       }
