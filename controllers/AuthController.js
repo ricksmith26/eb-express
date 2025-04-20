@@ -56,6 +56,7 @@ class AuthController {
         );
 
         res.setHeader("Authorization", `Bearer ${token}`);
+        console.log(`Redirecting to : ${process.env.FRONTEND_URL}/?token=${token}`)
         res.redirect(`${process.env.FRONTEND_URL}/?token=${token}`);
       });
     })(req, res, next);

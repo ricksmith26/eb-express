@@ -14,6 +14,7 @@ import calendarRoutes from "./routes/CalendarRoutes.js";
 import livekitRoutes from './routes/LivekitRoutes.js';
 import webRTCRoutes from './routes/WebRTCRoutes.js'
 import imagesRouter from './routes/ImagesRoutes.js';
+import {SpotifyRouter} from './routes/SpotifyRouter.js';
 import AsteriskRoutes from './routes/AsteriskRoutes.js';
 import modeRouter from './routes/ModeRoutes.js';
 import connectDB from './config/db.js';
@@ -39,8 +40,6 @@ export const io = new Server(server, {
     origin: "*"
   }
 });
-// import session from "express-session";
-// import MongoStore from "connect-mongo";
 
 app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse proxies
 app.use(
@@ -52,18 +51,9 @@ app.use(
 );
 
 
-
-// app.use(cookieSession({
-//   name: 'session',
-//   keys: ['email', 'auth_token']
-// }))
-
-// ✅ 2. JSON Parsing Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ 3. Session Middleware (After CORS)
-console.log(`🔍 Connecting to MongoDB for sessions at: ${process.env.MONGO_DB_URL}`);
 app.use((req, res, next) => {
   console.error("📝 PRE Session Middleware Debug: ", req.session);
   next();
@@ -109,6 +99,13 @@ socketInit(io)
 
 app.use('/send-webrtc-message', webRTCRoutes);
 app.use('/asterisk', AsteriskRoutes);
+const clientId = 'bc445b54c9a94b649f73f923c675320b';
+const clientSecret = 'e4e50fefcd2a4059a45fade10833f547';
+const redirectUri = `${process.env.FRONTEND_URL}/callback`;
+
+const spotifyRouter = new SpotifyRouter(clientId, clientSecret, redirectUri);
+
+app.use('/spotify', spotifyRouter.getRouter());
 setupAgenda()
 
 function getUserEmail(socketId) {

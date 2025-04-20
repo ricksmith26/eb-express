@@ -13,6 +13,7 @@
     "@sentry/cli": "^2.42.3",
     "@sentry/node": "^9.5.0",
     "agenda": "^5.0.0",
+    "axios": "^1.8.4",
     "connect-mongo": "^5.1.0",
     "cookie-parser": "~1.4.4",
     "cookie-session": "^2.1.0",

@@ -1,5 +1,3 @@
-import { io } from '../app.js';
-import { users } from '../socketIo/socketIo.js';
 import { AsteriskCredential } from '../models/Asterisk.js';
 
 class AsteriskController {
