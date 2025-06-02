@@ -18,8 +18,6 @@ class CalendarController {
     this.addEvent = this.addEvent.bind(this);
   }
 
-
-
   async getAuthenticatedCalendar(user) {
     this.oauth2Client.setCredentials({ refresh_token: user.refreshToken });
     return google.calendar({ version: "v3", auth: this.oauth2Client });
@@ -114,14 +112,17 @@ class CalendarController {
   }
 
   async addEvent(req, res) {
+    
     const { email, summary, start, end, description, location } = req.body;
-
+    
     if (!email || !summary || !start || !end) {
       return res.status(400).json({ error: "Missing required fields: email, summary, start, end" });
     }
-
+    
     try {
       const user = await User.findOne({ email });
+      const info = await this.oauth2Client.getTokenInfo(user.accessToken);
+      console.log("✅ Scopes granted:", info.scopes);
       if (!user || !user.refreshToken) {
         return res.status(404).json({ error: "User not found or no refresh token available" });
       }
