@@ -40,7 +40,7 @@ class AsteriskController {
 
   async getAllAgents(req, res) {
     try {
-      const credentials = await AsteriskCredential.find({ type: 'agent' })
+      const credentials = await AsteriskCredential.find({ type: 'agent' }).sort({ username: 1 });
       if (!credentials) return res.status(404).json({ message: 'No inactive agent found' });
       // console.,
       res.json(credentials);
@@ -108,7 +108,7 @@ class AsteriskController {
       res.status(500).json({ error: 'Failed to swap active agent and inactive customer' });
     }
   }
-  
+
   async setAgentStatus(req, res) {
     try {
       const { id } = req.params;
@@ -131,12 +131,14 @@ class AsteriskController {
       if (status === 'AVAILABLE') {
         console.log('PUSHING TO QUEUE', status)
         this.queueController.addAgentToQueue(agent)
+      } else {
+        this.queueController.removeAgentFromQueue(agent.username)
       }
       io.emit('agentStatusChange', { username: agent.username, status });
-      return res.json({ message: `Agent set to ${status}` });
+      return ({ message: `Agent set to ${status}` });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: 'Failed to update agent status' });
+      throw({ error: 'Failed to update agent status' });
     }
   }
 }

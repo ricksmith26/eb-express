@@ -10,17 +10,19 @@ export class QueueController {
         this.addCustomerToQueue = this.addCustomerToQueue.bind(this);
         this.addAgentToQueue = this.addAgentToQueue.bind(this);
         this.pairCustomerAndAgent = this.pairCustomerAndAgent.bind(this);
-        this.takeFirst = this.takeFirst.bind(this)
-        this.emitEventToPairing = this.emitEventToPairing.bind(this)
+        this.takeFirst = this.takeFirst.bind(this);
+        this.emitEventToPairing = this.emitEventToPairing.bind(this);
+        this.removeByUsername = this.removeByUsername.bind(this);
+        this.removeAgentFromQueue = this.removeAgentFromQueue.bind(this);
     }
 
     async addCustomerToQueue(customer) {
         try {
             this.customerQueue.push(customer)
             if (this.agentQueue.length > 0) {
-                const data  = this.pairCustomerAndAgent()
+                const data = this.pairCustomerAndAgent()
                 io.emit('emergencyCallConnection', data)
-                return(data)
+                return (data)
             }
             console.log(this.customerQueue)
             return res.json('Waiting in queue')
@@ -31,10 +33,11 @@ export class QueueController {
     async addAgentToQueue(agent) {
         try {
             this.agentQueue.push(agent)
+            console.log(this.agentQueue)
             if (this.customerQueue.length > 0) {
-                const data  = this.pairCustomerAndAgent()
+                const data = this.pairCustomerAndAgent()
                 io.emit('emergencyCallConnection', data)
-                return ({customer: data.customer, agent: data.agent})
+                return ({ customer: data.customer, agent: data.agent })
             }
             return ('ok')
         } catch (error) {
@@ -43,12 +46,23 @@ export class QueueController {
         }
     }
 
+    removeByUsername = (array, username) => {
+        return array.filter(item => item.username !== username);
+    };
+
+
+    removeAgentFromQueue(username) {
+        const adjustedQueue = this.removeByUsername(this.agentQueue, username)
+        this.agentQueue = adjustedQueue
+        console.log(this.agentQueue)
+    }
+
     pairCustomerAndAgent() {
         const customerData = this.takeFirst(this.customerQueue);
         const agentData = this.takeFirst(this.agentQueue);
         this.customerQueue = customerData.remainingQueue
         this.agentQueue = agentData.remainingQueue
-        return { 
+        return {
             customer: customerData.first,
             agent: agentData.first
         }
@@ -58,7 +72,7 @@ export class QueueController {
         console.log(queueArray)
         let first = queueArray[0]
         let remainingQueue = queueArray.slice(1)
-        console.log({first, remainingQueue}, '??')
+        console.log({ first, remainingQueue }, '??')
         return { first, remainingQueue }
     }
 
