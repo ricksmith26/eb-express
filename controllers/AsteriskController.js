@@ -22,6 +22,7 @@ class AsteriskController {
     this.getInactiveCustomer = this.getInactiveCustomer.bind(this);
     this.getActiveAgentAndInactiveCustomer = this.getActiveAgentAndInactiveCustomer.bind(this);
     this.setAgentStatus = this.setAgentStatus.bind(this);
+    this.updateAgentStatus = this.updateAgentStatus.bind(this);
     this.getAllAgents = this.getAllAgents.bind(this);
   }
 
@@ -107,16 +108,23 @@ class AsteriskController {
       res.status(500).json({ error: 'Failed to swap active agent and inactive customer' });
     }
   }
+  
   async setAgentStatus(req, res) {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      const agent = await AsteriskCredential.findById(id);
+      this.updateAgentStatus(id, status)
+    } catch (error){
+      updateAgentStatus
+    }
+  }
 
+  async updateAgentStatus(id, status) {
+    try {
+      const agent = await AsteriskCredential.findById(id);
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
       }
-
       agent.status = status;
       await agent.save();
       console.log('UPDATING STATUS: ',status)

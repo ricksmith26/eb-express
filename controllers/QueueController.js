@@ -17,10 +17,8 @@ export class QueueController {
     async addCustomerToQueue(customer) {
         try {
             this.customerQueue.push(customer)
-            console.log(this.customerQueue, "<<customerQueue<<", this.agentQueue, '<<<agentQueue')
             if (this.agentQueue.length > 0) {
                 const data  = this.pairCustomerAndAgent()
-                console.log(data, '<<<<<<<<<<<')
                 io.emit('emergencyCallConnection', data)
                 return(data)
             }
@@ -31,12 +29,10 @@ export class QueueController {
         }
     }
     async addAgentToQueue(agent) {
-        console.log(agent, '<<<<<<agent')
         try {
             this.agentQueue.push(agent)
             if (this.customerQueue.length > 0) {
                 const data  = this.pairCustomerAndAgent()
-                console.log(data)
                 io.emit('emergencyCallConnection', data)
                 return ({customer: data.customer, agent: data.agent})
             }
