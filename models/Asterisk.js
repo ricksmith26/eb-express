@@ -18,7 +18,11 @@ const AsteriskCredentialSchema = new Schema(
       default: 'wss',
     },
     domain: { type: String, required: true },
-    active: { type: Boolean, required: true },
+    status: {
+        type: String,
+        enum: ['AVAILABLE', 'INCOMING', 'OUTGOING', 'HOLD', 'AFTER_CALL', 'INACTIVE'],
+        default: ['INACTIVE']
+      },
     port: { type: Number, default: 5060 },
     agent: {
       type: Schema.Types.ObjectId,

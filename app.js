@@ -16,6 +16,7 @@ import webRTCRoutes from './routes/WebRTCRoutes.js'
 import imagesRouter from './routes/ImagesRoutes.js';
 import {SpotifyRouter} from './routes/SpotifyRouter.js';
 import AsteriskRoutes from './routes/AsteriskRoutes.js';
+import QueueRoutes from './routes/QueueRouter.js';
 import modeRouter from './routes/ModeRoutes.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
@@ -99,6 +100,7 @@ socketInit(io)
 
 app.use('/send-webrtc-message', webRTCRoutes);
 app.use('/asterisk', AsteriskRoutes);
+app.use('/queue', QueueRoutes);
 const clientId = 'bc445b54c9a94b649f73f923c675320b';
 const clientSecret = 'e4e50fefcd2a4059a45fade10833f547';
 const redirectUri = `${process.env.FRONTEND_URL}/callback`;

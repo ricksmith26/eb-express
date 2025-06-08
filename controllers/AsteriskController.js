@@ -1,11 +1,28 @@
 import { AsteriskCredential } from '../models/Asterisk.js';
+import { Agents } from '../socketIo/socketIo.js';
+import { io } from '../app.js'
+import QueueController from './QueueController.js';
+const updateStatus = async (id, status) => {
+  const agent = await AsteriskCredential.findById(id);
+
+  if (!agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  agent.status = status;
+  await agent.save();
+
+}
 
 class AsteriskController {
   constructor() {
+    this.queueController = QueueController
     this.addAddAsteriskCredentials = this.addAddAsteriskCredentials.bind(this);
     this.getInactiveAgent = this.getInactiveAgent.bind(this);
+    this.getInactiveCustomer = this.getInactiveCustomer.bind(this);
     this.getActiveAgentAndInactiveCustomer = this.getActiveAgentAndInactiveCustomer.bind(this);
-    this.setAgentInactive = this.setAgentInactive.bind(this);
+    this.setAgentStatus = this.setAgentStatus.bind(this);
+    this.getAllAgents = this.getAllAgents.bind(this);
   }
 
   async addAddAsteriskCredentials(req, res) {
@@ -20,9 +37,21 @@ class AsteriskController {
     }
   }
 
+  async getAllAgents(req, res) {
+    try {
+      const credentials = await AsteriskCredential.find({ type: 'agent' })
+      if (!credentials) return res.status(404).json({ message: 'No inactive agent found' });
+      // console.,
+      res.json(credentials);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to get inactive agent' });
+    }
+  }
+
   async getInactiveAgent(req, res) {
     try {
-      const credential = await AsteriskCredential.findOne({ type: 'agent', active: false }).populate('agent');
+      const credential = await AsteriskCredential.findOne({ type: 'agent', status: 'INACTIVE' })
       if (!credential) return res.status(404).json({ message: 'No inactive agent found' });
       res.json(credential);
     } catch (error) {
@@ -31,31 +60,44 @@ class AsteriskController {
     }
   }
 
+  async getInactiveCustomer(req, res) {
+    console.log('hit')
+    try {
+      const credential = await AsteriskCredential.findOne({ type: 'customer', status: 'INACTIVE' })
+      if (!credential) return res.status(404).json({ message: 'No inactive customer found' });
+      this.queueController.addCustomerToQueue(credential)
+      res.json(credential);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to get inactive customer' });
+    }
+  }
+
   async getActiveAgentAndInactiveCustomer(req, res) {
     try {
-      const activeAgent = await AsteriskCredential.findOne({ type: 'agent', active: true });
-      const inactiveCustomer = await AsteriskCredential.findOne({ type: 'customer', active: false });
-  
+      const activeAgent = await AsteriskCredential.findOne({ type: 'agent', status: 'INACTIVE' });
+      const inactiveCustomer = await AsteriskCredential.findOne({ type: 'customer', status: 'INACTIVE' });
+
       if (!activeAgent && !inactiveCustomer) {
         return res.status(404).json({ error: 'No active agent and no inactive customer found' });
       }
-  
+
       if (!activeAgent) {
         return res.status(404).json({ error: 'No active agent found' });
       }
-  
+
       if (!inactiveCustomer) {
         return res.status(404).json({ error: 'No inactive customer found' });
       }
 
       activeAgent.active = false;
       inactiveCustomer.active = true;
-  
+
       await Promise.all([
         activeAgent.save(),
         inactiveCustomer.save()
       ]);
-  
+
       res.json({
         activeAgent,
         inactiveCustomer,
@@ -65,23 +107,28 @@ class AsteriskController {
       res.status(500).json({ error: 'Failed to swap active agent and inactive customer' });
     }
   }
-  async setAgentInactive(req, res) {
+  async setAgentStatus(req, res) {
     try {
       const { id } = req.params;
-  
-      const agent = await AsteriskCredential.findOne({ _id: id, type: 'agent' });
-  
+      const { status } = req.body;
+      const agent = await AsteriskCredential.findById(id);
+
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
       }
-  
-      agent.active = false;
+
+      agent.status = status;
       await agent.save();
-  
-      res.json({ message: 'Agent set to inactive', agent });
+      console.log('UPDATING STATUS: ',status)
+      if (status === 'AVAILABLE') {
+        console.log('PUSHING TO QUEUE', status)
+        this.queueController.addAgentToQueue(agent)
+      }
+      io.emit('agentStatusChange', { username: agent.username, status });
+      return res.json({ message: `Agent set to ${status}` });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: 'Failed to set agent as inactive' });
+      res.status(500).json({ error: 'Failed to update agent status' });
     }
   }
 }

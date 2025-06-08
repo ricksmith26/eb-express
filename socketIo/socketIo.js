@@ -10,7 +10,9 @@ import disconnect from './events/disconnect.js'
 import message from './events/message.js'
 import emergencyCall from './events/emergencyCall.js'
 import modeChange from './events/modeChange.js'
+import registerAgent from './events/registerAgent.js'
 export const users = new Map();
+export const Agents = new Map();
 
 
 export function getUserEmail(socketId) {
@@ -39,12 +41,16 @@ export const socketInit = (io) => {
     
       iceCandidate(socket, users, io)
     
-      disconnect(socket, users)
+      disconnect(socket, users, Agents)
 
       message(socket, users)
 
       emergencyCall(socket, users, io)
 
       modeChange(socket, users, io)
+
+      // agentStatusChange(socket, Agents, agent, stat)
+
+      registerAgent(socket, Agents)
     });
 }
