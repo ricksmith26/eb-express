@@ -1,4 +1,6 @@
 import { AsteriskCredential } from '../../models/Asterisk.js';
+import { io } from '../../app.js';
+import QueueController from '../../controllers/QueueController.js'
 
 const disconnect = (socket, users, agents) => {
     console.log('DISCONNECTION<<<<<<<<', agents)
@@ -13,6 +15,7 @@ const disconnect = (socket, users, agents) => {
         for (const [username, id] of agents.entries()) {
             console.log(agents, '<<<<<<<<', username, id, socket.id)
             if (id === socket.id) {
+                QueueController.removeAgentFromQueue(username)
                 agents.delete(username);
                 console.log('agents shoul be empty>>>', agents)
                 const agent = await AsteriskCredential.findOne({ username });
