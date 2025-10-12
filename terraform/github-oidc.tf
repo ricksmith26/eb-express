@@ -100,6 +100,8 @@ resource "aws_iam_policy" "github_actions_policy" {
           "iam:TagInstanceProfile",
           "iam:CreatePolicy",
           "iam:DeletePolicy",
+          "iam:CreatePolicyVersion",
+          "iam:DeletePolicyVersion",
           "iam:CreateOpenIDConnectProvider",
           "iam:DeleteOpenIDConnectProvider",
           "iam:TagPolicy",
