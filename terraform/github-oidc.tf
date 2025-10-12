@@ -133,7 +133,9 @@ resource "aws_iam_policy" "github_actions_policy" {
           "s3:GetBucketNotification",
           "s3:GetReplicationConfiguration",
           "s3:GetLifecycleConfiguration",
-          "s3:GetBucketObjectLockConfiguration"
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetBucketOwnershipControls"
         ]
         Resource = [
           "arn:aws:s3:::eb-express-terraform-state",
