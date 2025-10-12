@@ -146,6 +146,10 @@ resource "aws_key_pair" "app_key" {
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
+
+  lifecycle {
+    ignore_changes = [public_key]
+  }
 }
 
 # EC2 Instance
