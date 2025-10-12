@@ -116,12 +116,12 @@ jobs:
           ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
             cat > /home/ec2-user/eb-express/.env.local << 'ENVEOF'
           NODE_ENV=production
-          MONGO_DB_URL=${{ secrets.MONGO_DB_URL }}
-          API_URL=${{ secrets.API_URL }}
-          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
+          MONGO_DB_URL=${{ vars.MONGO_DB_URL || secrets.MONGO_DB_URL }}
+          API_URL=${{ vars.API_URL || secrets.API_URL }}
+          FRONTEND_URL=${{ vars.FRONTEND_URL || secrets.FRONTEND_URL }}
+          GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ vars.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL=${{ vars.GOOGLE_CALLBACK_URL || secrets.GOOGLE_CALLBACK_URL }}
           ENVEOF
           EOF
 
