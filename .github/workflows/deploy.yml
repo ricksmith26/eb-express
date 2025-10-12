@@ -157,7 +157,7 @@ jobs:
 
             # Display status
             pm2 status
-            pm2 logs --lines 20
+            pm2 logs --lines 20 --nostream
           EOF
 
       - name: Verify deployment
