@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "eb-express-terraform-state"  # You'll need to create this bucket
+    bucket         = "eb-express-terraform-state" # You'll need to create this bucket
     key            = "production/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
-    dynamodb_table = "eb-express-terraform-locks"  # Optional: for state locking
+    dynamodb_table = "eb-express-terraform-locks" # Optional: for state locking
   }
 }
 
@@ -53,7 +53,7 @@ resource "aws_security_group" "app_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting this to your IP
+    cidr_blocks = ["0.0.0.0/0"] # Consider restricting this to your IP
     description = "SSH access"
   }
 
