@@ -7,6 +7,9 @@ const userSchema = new mongoose.Schema({
   picture: String,
   accessToken: String,
   refreshToken: String, // ✅ Store refresh token
+  calendarChannelId: String, // For Google Calendar webhook notifications
+  calendarResourceId: String, // For Google Calendar webhook notifications
+  calendarChannelExpiration: Date, // When the webhook subscription expires
   createdAt: { type: Date, default: Date.now },
 });
 

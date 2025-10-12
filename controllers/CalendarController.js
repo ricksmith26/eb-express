@@ -16,6 +16,8 @@ class CalendarController {
     this.getThisWeeksCalendar = this.getThisWeeksCalendar.bind(this);
     this.getEventsByDate = this.getEventsByDate.bind(this);
     this.addEvent = this.addEvent.bind(this);
+    this.subscribeToCalendarUpdates = this.subscribeToCalendarUpdates.bind(this);
+    this.unsubscribeFromCalendarUpdates = this.unsubscribeFromCalendarUpdates.bind(this);
   }
 
   async getAuthenticatedCalendar(user) {
@@ -112,13 +114,13 @@ class CalendarController {
   }
 
   async addEvent(req, res) {
-    
+
     const { email, summary, start, end, description, location } = req.body;
-    
+
     if (!email || !summary || !start || !end) {
       return res.status(400).json({ error: "Missing required fields: email, summary, start, end" });
     }
-    
+
     try {
       const user = await User.findOne({ email });
       const info = await this.oauth2Client.getTokenInfo(user.accessToken);
@@ -146,6 +148,114 @@ class CalendarController {
     } catch (error) {
       console.error("❌ Error adding event:", error);
       res.status(500).json({ error: "Failed to create calendar event" });
+    }
+  }
+
+  /**
+   * Subscribe to Google Calendar push notifications
+   * This sets up a webhook that Google will call when the user's calendar changes
+   */
+  async subscribeToCalendarUpdates(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await User.findOne({ email });
+      if (!user || !user.refreshToken) {
+        return res.status(404).json({ error: "User not found or no refresh token available" });
+      }
+
+      await TokenController.refreshAccessToken(user);
+      const calendar = await this.getAuthenticatedCalendar(user);
+
+      // Generate a unique channel ID for this user
+      const channelId = `calendar-${user._id}-${Date.now()}`;
+      const webhookUrl = `${process.env.BACKEND_URL}/webhook/google-calendar`;
+
+      console.log(`📅 Subscribing to calendar updates for ${email}`);
+      console.log(`Webhook URL: ${webhookUrl}`);
+
+      // Subscribe to calendar changes using Google Calendar Push Notifications API
+      const response = await calendar.events.watch({
+        calendarId: 'primary',
+        requestBody: {
+          id: channelId,
+          type: 'web_hook',
+          address: webhookUrl,
+          token: user._id.toString(), // Use user ID as verification token
+        },
+      });
+
+      // Store the channel information in the user document
+      user.calendarChannelId = response.data.id;
+      user.calendarResourceId = response.data.resourceId;
+      user.calendarChannelExpiration = new Date(parseInt(response.data.expiration));
+      await user.save();
+
+      console.log('✅ Successfully subscribed to calendar updates:', response.data);
+
+      res.status(200).json({
+        message: 'Successfully subscribed to calendar updates',
+        channelId: response.data.id,
+        expiration: user.calendarChannelExpiration,
+      });
+    } catch (error) {
+      console.error('❌ Error subscribing to calendar updates:', error);
+      res.status(500).json({
+        error: 'Failed to subscribe to calendar updates',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Unsubscribe from Google Calendar push notifications
+   */
+  async unsubscribeFromCalendarUpdates(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await User.findOne({ email });
+      if (!user || !user.calendarChannelId) {
+        return res.status(404).json({
+          error: "User not found or no active subscription"
+        });
+      }
+
+      const calendar = await this.getAuthenticatedCalendar(user);
+
+      // Stop the channel
+      await calendar.channels.stop({
+        requestBody: {
+          id: user.calendarChannelId,
+          resourceId: user.calendarResourceId,
+        },
+      });
+
+      // Clear the channel information from the user document
+      user.calendarChannelId = undefined;
+      user.calendarResourceId = undefined;
+      user.calendarChannelExpiration = undefined;
+      await user.save();
+
+      console.log(`✅ Successfully unsubscribed from calendar updates for ${email}`);
+
+      res.status(200).json({
+        message: 'Successfully unsubscribed from calendar updates',
+      });
+    } catch (error) {
+      console.error('❌ Error unsubscribing from calendar updates:', error);
+      res.status(500).json({
+        error: 'Failed to unsubscribe from calendar updates',
+        details: error.message
+      });
     }
   }
 }

@@ -11,6 +11,7 @@ import patientsRouter from './routes/patientsRouter.js';
 import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
+import webhookRoutes from "./routes/webhookRoutes.js";
 import livekitRoutes from './routes/livekitRoutes.js';
 import webRTCRoutes from './routes/webRTCRoutes.js'
 import imagesRouter from './routes/imagesRoutes.js';
@@ -94,6 +95,7 @@ app.use("/relatedPerson", relatedPersonRoutes);
 app.use("/images", imagesRouter)
 app.use("/api/livekit", livekitRoutes);
 app.use("/calendar", calendarRoutes);
+app.use("/webhook", webhookRoutes);
 app.use("/modes", modeRouter);
 
 socketInit(io)

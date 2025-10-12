@@ -18,6 +18,58 @@ export const isAlreadyScheduled = async (agenda, email, event) => {
     return existingJobs.length > 0;
 };
 
+/**
+ * Schedule or update a calendar event in Agenda
+ * This function is called by the webhook when a calendar is updated
+ */
+export const scheduleCalendarEvent = async (email, event) => {
+    try {
+        if (!event.start || !event.start.dateTime) {
+            console.log(`⚠️ Skipping event without dateTime: ${event.summary}`);
+            return;
+        }
+
+        const eventStartTime = new Date(event.start.dateTime);
+        const now = new Date();
+
+        // Only schedule future events
+        if (eventStartTime <= now) {
+            console.log(`⚠️ Skipping past event: ${event.summary}`);
+            return;
+        }
+
+        // Check if event is already scheduled
+        if (await isAlreadyScheduled(agenda, email, event)) {
+            console.log(`ℹ️ Event already scheduled: ${event.summary} for ${email}`);
+
+            // Update existing job if event time has changed
+            const existingJobs = await agenda.jobs({
+                name: 'notify user of event',
+                'data.email': email,
+                'data.event.id': event.id
+            });
+
+            for (const job of existingJobs) {
+                const existingTime = new Date(job.attrs.data.event.start.dateTime);
+                if (existingTime.getTime() !== eventStartTime.getTime()) {
+                    // Event time changed, remove old job and create new one
+                    await job.remove();
+                    await agenda.schedule(eventStartTime, 'notify user of event', { email, event });
+                    console.log(`✅ Updated event schedule: ${event.summary} for ${email}`);
+                }
+            }
+            return;
+        }
+
+        // Schedule new event
+        await agenda.schedule(eventStartTime, 'notify user of event', { email, event });
+        console.log(`✅ Scheduled new event: ${event.summary} for ${email} at ${eventStartTime}`);
+    } catch (error) {
+        console.error(`❌ Error scheduling event for ${email}:`, error);
+        throw error;
+    }
+};
+
 export const setupAgenda = async (io) => {
 
     agenda.define('test' , async(job) => {
@@ -77,7 +129,7 @@ export const setupAgenda = async (io) => {
     await agenda.start(); // ✅ Wait for Agenda to initialize before scheduling
     // await agenda.schedule('in 5 seconds', 'schedule daily events'); // Safe now
     await agenda.cancel({ name: 'schedule daily events' });
-    await agenda.every('1 hour', 'schedule daily events'); // Safe now
+    // await agenda.every('1 hour', 'schedule daily events'); // Safe now
     // await agenda.schedule('in 10 seconds', 'test')
     // // await agenda.schedule('in 15 seconds', 'notify user of event', {email:'ricksmith69@gmail.com', event: {summary: 'party time', start: '09:00'}})
     // const now = new Date();
