@@ -1,4 +1,3 @@
-
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
@@ -8,3 +7,21 @@ node_modules
 .env
 .elasticbeanstalk
 .env.local
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan
+.terraform.lock.hcl
+
+# SSH Keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+
+# OS files
+.DS_Store
+Thumbs.db

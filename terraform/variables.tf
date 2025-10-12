@@ -38,3 +38,21 @@ variable "github_repo" {
   type        = string
   default     = "eb-express"
 }
+
+variable "domain_name" {
+  description = "Domain name for the application"
+  type        = string
+  default     = "brigid-personal-assistant.com"
+}
+
+variable "create_root_record" {
+  description = "Create A record for root domain"
+  type        = bool
+  default     = false
+}
+
+variable "create_www_record" {
+  description = "Create A record for www subdomain"
+  type        = bool
+  default     = false
+}

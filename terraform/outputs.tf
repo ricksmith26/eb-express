@@ -27,3 +27,23 @@ output "oidc_role_arn" {
   description = "ARN of the OIDC IAM role for GitHub Actions"
   value       = aws_iam_role.github_actions_role.arn
 }
+
+output "api_domain" {
+  description = "API domain name"
+  value       = "api.${var.domain_name}"
+}
+
+output "api_url" {
+  description = "Full API URL"
+  value       = "https://api.${var.domain_name}"
+}
+
+output "route53_zone_id" {
+  description = "Route53 hosted zone ID"
+  value       = data.aws_route53_zone.main.zone_id
+}
+
+output "route53_name_servers" {
+  description = "Route53 name servers (update these in your domain registrar)"
+  value       = data.aws_route53_zone.main.name_servers
+}

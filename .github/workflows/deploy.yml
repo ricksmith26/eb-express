@@ -1,0 +1,163 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  TF_VERSION: 1.9.0
+
+jobs:
+  terraform:
+    name: Terraform Infrastructure
+    runs-on: ubuntu-latest
+    outputs:
+      instance_ip: ${{ steps.terraform_output.outputs.instance_ip }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ./terraform
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ./terraform
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        working-directory: ./terraform
+        env:
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_github_org: ${{ github.repository_owner }}
+          TF_VAR_github_repo: ${{ github.event.repository.name }}
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve tfplan
+        working-directory: ./terraform
+
+      - name: Get Terraform Outputs
+        id: terraform_output
+        run: |
+          echo "instance_ip=$(terraform output -raw instance_public_ip)" >> $GITHUB_OUTPUT
+        working-directory: ./terraform
+
+  deploy:
+    name: Deploy Application
+    needs: terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/eb-express-key.pem
+          chmod 600 ~/.ssh/eb-express-key.pem
+          ssh-keyscan -H ${{ needs.terraform.outputs.instance_ip }} >> ~/.ssh/known_hosts
+
+      - name: Wait for instance to be ready
+        run: |
+          echo "Waiting for instance to be ready..."
+          for i in {1..30}; do
+            if ssh -i ~/.ssh/eb-express-key.pem -o ConnectTimeout=5 ec2-user@${{ needs.terraform.outputs.instance_ip }} "echo 'Instance is ready'"; then
+              echo "Instance is ready!"
+              break
+            fi
+            echo "Attempt $i: Instance not ready yet, waiting..."
+            sleep 10
+          done
+
+      - name: Create .env.local on server
+        run: |
+          ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
+            cat > /home/ec2-user/eb-express/.env.local << 'ENVEOF'
+          NODE_ENV=production
+          MONGO_DB_URL=${{ secrets.MONGO_DB_URL }}
+          API_URL=${{ secrets.API_URL }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
+          ENVEOF
+          EOF
+
+      - name: Deploy application code
+        run: |
+          rsync -avz --progress \
+            -e "ssh -i ~/.ssh/eb-express-key.pem" \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude '.env.local' \
+            --exclude 'terraform' \
+            --exclude '.github' \
+            ./ ec2-user@${{ needs.terraform.outputs.instance_ip }}:/home/ec2-user/eb-express/
+
+      - name: Install dependencies and restart application
+        run: |
+          ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
+            cd /home/ec2-user/eb-express
+
+            # Install production dependencies
+            npm ci --production
+
+            # Stop existing PM2 processes
+            pm2 stop ecosystem.config.cjs || true
+            pm2 delete ecosystem.config.cjs || true
+
+            # Start application with PM2
+            pm2 start ecosystem.config.cjs
+
+            # Save PM2 process list
+            pm2 save
+
+            # Display status
+            pm2 status
+            pm2 logs --lines 20
+          EOF
+
+      - name: Verify deployment
+        run: |
+          echo "Deployment completed successfully!"
+          echo "Instance IP: ${{ needs.terraform.outputs.instance_ip }}"
+          echo "SSH command: ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }}"
