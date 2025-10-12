@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import ImagesController from "../controllers/ImagesController.js"; // make sure the filename matches
+import ImagesController from "../controllers/imagesController.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);

@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import PatientController from "../controllers/PatientController.js";
+import PatientController from "../controllers/patientController.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);

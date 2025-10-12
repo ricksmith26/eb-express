@@ -1,5 +1,5 @@
 import express from "express";
-import WebRTCController from "../controllers/WebRTCController.js";
+import WebRTCController from "../controllers/webRTCController.js";
 
 class WebRTCRoutes {
   constructor() {

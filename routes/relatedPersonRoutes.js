@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import RelatedPersonController from "../controllers/RelatedPersonController.js";
+import RelatedPersonController from "../controllers/relatedPersonController.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);
