@@ -145,20 +145,19 @@ jobs:
         run: |
           # Create a tarball of the application
           echo "Creating application tarball..."
-          tar -czf app.tar.gz \
+          tar -czf /tmp/app.tar.gz \
             --exclude='node_modules' \
             --exclude='.git' \
             --exclude='.env*' \
             --exclude='terraform' \
             --exclude='.github' \
-            --exclude='*.tar.gz' \
             .
 
           # Upload to S3
           echo "Uploading to S3..."
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          aws s3 cp app.tar.gz "s3://eb-express-terraform-state/deployments/app-${TIMESTAMP}.tar.gz"
-          aws s3 cp app.tar.gz "s3://eb-express-terraform-state/deployments/app-latest.tar.gz"
+          aws s3 cp /tmp/app.tar.gz "s3://eb-express-terraform-state/deployments/app-${TIMESTAMP}.tar.gz"
+          aws s3 cp /tmp/app.tar.gz "s3://eb-express-terraform-state/deployments/app-latest.tar.gz"
 
           # Download and extract on EC2 via SSM
           echo "Deploying to EC2..."
