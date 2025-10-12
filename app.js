@@ -8,12 +8,12 @@ import cors from "cors";
 import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
 import patientsRouter from './routes/patientsRouter.js';
-import relatedPersonRoutes from "./routes/RelatedPersonRoutes.js";
+import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import calendarRoutes from "./routes/CalendarRoutes.js";
-import livekitRoutes from './routes/LivekitRoutes.js';
-import webRTCRoutes from './routes/WebRTCRoutes.js'
-import imagesRouter from './routes/ImagesRoutes.js';
+import calendarRoutes from "./routes/calendarRoutes.js";
+import livekitRoutes from './routes/livekitRoutes.js';
+import webRTCRoutes from './routes/webRTCRoutes.js'
+import imagesRouter from './routes/imagesRoutes.js';
 import {SpotifyRouter} from './routes/SpotifyRouter.js';
 import AsteriskRoutes from './routes/AsteriskRoutes.js';
 import QueueRoutes from './routes/QueueRouter.js';
