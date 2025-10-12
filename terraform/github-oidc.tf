@@ -122,7 +122,10 @@ resource "aws_iam_policy" "github_actions_policy" {
           "s3:GetBucketPolicy",
           "s3:GetBucketVersioning",
           "s3:GetEncryptionConfiguration",
-          "s3:GetBucketPublicAccessBlock"
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketAcl",
+          "s3:GetBucketTagging",
+          "s3:GetBucketLocation"
         ]
         Resource = [
           "arn:aws:s3:::eb-express-terraform-state",
@@ -137,7 +140,8 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:DeleteItem",
           "dynamodb:DescribeTable",
           "dynamodb:DescribeContinuousBackups",
-          "dynamodb:DescribeTimeToLive"
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:ListTagsOfResource"
         ]
         Resource = "arn:aws:dynamodb:*:*:table/eb-express-terraform-locks"
       },
@@ -148,7 +152,8 @@ resource "aws_iam_policy" "github_actions_policy" {
           "route53:ListHostedZones",
           "route53:ListResourceRecordSets",
           "route53:ChangeResourceRecordSets",
-          "route53:GetChange"
+          "route53:GetChange",
+          "route53:ListTagsForResource"
         ]
         Resource = "*"
       }
