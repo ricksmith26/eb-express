@@ -173,7 +173,7 @@ class CalendarController {
 
       // Generate a unique channel ID for this user
       const channelId = `calendar-${user._id}-${Date.now()}`;
-      const webhookUrl = `${process.env.BACKEND_URL}/webhook/google-calendar`;
+      const webhookUrl = `${process.env.API_URL}/webhook/google-calendar`;
 
       console.log(`📅 Subscribing to calendar updates for ${email}`);
       console.log(`Webhook URL: ${webhookUrl}`);
