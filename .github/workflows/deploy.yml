@@ -142,10 +142,17 @@ jobs:
           ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
             cd /home/ec2-user/eb-express
 
-            # Install production dependencies
-            npm ci --production
+            # Install/update production dependencies only if needed
+            echo "Checking dependencies..."
+            if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules" ]; then
+              echo "Installing dependencies..."
+              npm install --omit=dev --prefer-offline --no-audit
+            else
+              echo "Dependencies are up to date, skipping install"
+            fi
 
             # Stop existing PM2 processes
+            echo "Restarting application..."
             pm2 stop ecosystem.config.cjs || true
             pm2 delete ecosystem.config.cjs || true
 
@@ -156,6 +163,7 @@ jobs:
             pm2 save
 
             # Display status
+            echo "Deployment complete!"
             pm2 status
             pm2 logs --lines 20 --nostream
           EOF
