@@ -13,8 +13,8 @@ yum update -y
 curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
 yum install -y nodejs
 
-# Install git
-yum install -y git
+# Install git and rsync
+yum install -y git rsync
 
 # Install PM2 globally for process management
 npm install -g pm2

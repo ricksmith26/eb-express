@@ -107,6 +107,10 @@ jobs:
             sleep 10
           done
 
+      - name: Ensure rsync is installed on server
+        run: |
+          ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} "sudo yum install -y rsync"
+
       - name: Create .env.local on server
         run: |
           ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
