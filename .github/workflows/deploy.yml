@@ -93,13 +93,14 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/eb-express-key.pem
           chmod 600 ~/.ssh/eb-express-key.pem
-          ssh-keyscan -H ${{ needs.terraform.outputs.instance_ip }} >> ~/.ssh/known_hosts
+          echo "Adding ${{ needs.terraform.outputs.instance_ip }} to known_hosts..."
+          ssh-keyscan -H -T 10 ${{ needs.terraform.outputs.instance_ip }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed, continuing anyway"
 
       - name: Wait for instance to be ready
         run: |
           echo "Waiting for instance to be ready..."
           for i in {1..30}; do
-            if ssh -i ~/.ssh/eb-express-key.pem -o ConnectTimeout=5 ec2-user@${{ needs.terraform.outputs.instance_ip }} "echo 'Instance is ready'"; then
+            if ssh -i ~/.ssh/eb-express-key.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} "echo 'Instance is ready'"; then
               echo "Instance is ready!"
               break
             fi
@@ -109,11 +110,11 @@ jobs:
 
       - name: Ensure rsync is installed on server
         run: |
-          ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} "sudo yum install -y rsync"
+          ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} "sudo yum install -y rsync"
 
       - name: Create .env.local on server
         run: |
-          ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
+          ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
             cat > /home/ec2-user/eb-express/.env.local << 'ENVEOF'
           NODE_ENV=production
           MONGO_DB_URL=${{ vars.MONGO_DB_URL || secrets.MONGO_DB_URL }}
@@ -128,7 +129,7 @@ jobs:
       - name: Deploy application code
         run: |
           rsync -avz --progress \
-            -e "ssh -i ~/.ssh/eb-express-key.pem" \
+            -e "ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no" \
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude '.env' \
@@ -139,7 +140,7 @@ jobs:
 
       - name: Install dependencies and restart application
         run: |
-          ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
+          ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
             cd /home/ec2-user/eb-express
 
             # Install/update production dependencies only if needed
