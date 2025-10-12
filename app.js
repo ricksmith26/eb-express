@@ -7,7 +7,7 @@ import logger from 'morgan';
 import cors from "cors";
 import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
-import patientsRouter from './routes/PatientsRouter.js';
+import patientsRouter from './routes/patientsRouter.js';
 import relatedPersonRoutes from "./routes/RelatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import calendarRoutes from "./routes/CalendarRoutes.js";
