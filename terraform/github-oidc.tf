@@ -196,7 +196,9 @@ resource "aws_iam_policy" "deployment_policy" {
         Action = [
           "ssm:SendCommand",
           "ssm:GetCommandInvocation",
-          "ssm:ListCommands"
+          "ssm:ListCommands",
+          "ssm:DescribeInstanceInformation",
+          "ssm:StartSession"
         ]
         Resource = "*"
       },

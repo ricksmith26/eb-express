@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       instance_ip: ${{ steps.terraform_output.outputs.instance_ip }}
+      instance_id: ${{ steps.terraform_output.outputs.instance_id }}
 
     steps:
       - name: Checkout code
@@ -71,6 +72,7 @@ jobs:
         id: terraform_output
         run: |
           echo "instance_ip=$(terraform output -raw instance_public_ip)" >> $GITHUB_OUTPUT
+          echo "instance_id=$(terraform output -raw instance_id)" >> $GITHUB_OUTPUT
         working-directory: ./terraform
 
   deploy:
@@ -88,34 +90,32 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup SSH key
+      - name: Wait for SSM to be ready
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/eb-express-key.pem
-          chmod 600 ~/.ssh/eb-express-key.pem
-          echo "Adding ${{ needs.terraform.outputs.instance_ip }} to known_hosts..."
-          ssh-keyscan -H -T 10 ${{ needs.terraform.outputs.instance_ip }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed, continuing anyway"
-
-      - name: Wait for instance to be ready
-        run: |
-          echo "Waiting for instance to be ready..."
+          echo "Waiting for SSM agent to be online..."
           for i in {1..30}; do
-            if ssh -i ~/.ssh/eb-express-key.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} "echo 'Instance is ready'"; then
-              echo "Instance is ready!"
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${{ needs.terraform.outputs.instance_id }}" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text 2>/dev/null || echo "NotFound")
+
+            if [ "$STATUS" = "Online" ]; then
+              echo "✓ SSM agent is online!"
               break
             fi
-            echo "Attempt $i: Instance not ready yet, waiting..."
+            echo "Attempt $i/30: SSM status is '$STATUS', waiting..."
             sleep 10
           done
 
-      - name: Ensure rsync is installed on server
-        run: |
-          ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} "sudo yum install -y rsync"
+          if [ "$STATUS" != "Online" ]; then
+            echo "ERROR: SSM agent did not come online"
+            exit 1
+          fi
 
       - name: Create .env.local on server
         run: |
-          ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
-            cat > /home/ec2-user/eb-express/.env.local << 'ENVEOF'
+          cat > /tmp/create-env.sh << 'EOF'
+          cat > /home/ec2-user/eb-express/.env.local << 'ENVEOF'
           NODE_ENV=production
           MONGO_DB_URL=${{ vars.MONGO_DB_URL || secrets.MONGO_DB_URL }}
           API_URL=${{ vars.API_URL || secrets.API_URL }}
@@ -124,53 +124,113 @@ jobs:
           GOOGLE_CLIENT_SECRET=${{ vars.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL=${{ vars.GOOGLE_CALLBACK_URL || secrets.GOOGLE_CALLBACK_URL }}
           ENVEOF
+          chown ec2-user:ec2-user /home/ec2-user/eb-express/.env.local
           EOF
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ needs.terraform.outputs.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file:///dev/stdin \
+            --output text \
+            --query 'Command.CommandId' << PARAMS
+          {
+            "commands": ["$(cat /tmp/create-env.sh | sed 's/"/\\"/g' | tr '\n' ';')"]
+          }
+          PARAMS)
+
+          echo "Waiting for environment file creation..."
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${{ needs.terraform.outputs.instance_id }}" || true
 
       - name: Deploy application code
         run: |
-          rsync -avz --progress \
-            -e "ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no" \
-            --exclude 'node_modules' \
-            --exclude '.git' \
-            --exclude '.env' \
-            --exclude '.env.local' \
-            --exclude 'terraform' \
-            --exclude '.github' \
-            ./ ec2-user@${{ needs.terraform.outputs.instance_ip }}:/home/ec2-user/eb-express/
+          # Create a tarball of the application
+          echo "Creating application tarball..."
+          tar -czf app.tar.gz \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='.env*' \
+            --exclude='terraform' \
+            --exclude='.github' \
+            --exclude='*.tar.gz' \
+            .
+
+          # Upload to S3
+          echo "Uploading to S3..."
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          aws s3 cp app.tar.gz "s3://eb-express-terraform-state/deployments/app-${TIMESTAMP}.tar.gz"
+          aws s3 cp app.tar.gz "s3://eb-express-terraform-state/deployments/app-latest.tar.gz"
+
+          # Download and extract on EC2 via SSM
+          echo "Deploying to EC2..."
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ needs.terraform.outputs.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /home/ec2-user",
+              "aws s3 cp s3://eb-express-terraform-state/deployments/app-latest.tar.gz /tmp/app.tar.gz",
+              "mkdir -p eb-express",
+              "tar -xzf /tmp/app.tar.gz -C eb-express",
+              "chown -R ec2-user:ec2-user eb-express",
+              "rm /tmp/app.tar.gz",
+              "echo \"Application code deployed successfully\""
+            ]' \
+            --output text \
+            --query 'Command.CommandId')
+
+          echo "Waiting for code deployment..."
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${{ needs.terraform.outputs.instance_id }}"
+
+          # Show output
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ needs.terraform.outputs.instance_id }}" \
+            --query 'StandardOutputContent' \
+            --output text
 
       - name: Install dependencies and restart application
         run: |
-          ssh -i ~/.ssh/eb-express-key.pem -o StrictHostKeyChecking=no ec2-user@${{ needs.terraform.outputs.instance_ip }} << 'EOF'
-            cd /home/ec2-user/eb-express
+          echo "Installing dependencies and restarting application..."
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ needs.terraform.outputs.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /home/ec2-user/eb-express",
+              "echo \"Checking dependencies...\"",
+              "if [ ! -d node_modules ] || [ package.json -nt node_modules ]; then",
+              "  echo \"Installing dependencies...\"",
+              "  sudo -u ec2-user npm install --omit=dev --prefer-offline --no-audit",
+              "else",
+              "  echo \"Dependencies are up to date\"",
+              "fi",
+              "echo \"Restarting application...\"",
+              "sudo -u ec2-user pm2 stop ecosystem.config.cjs 2>/dev/null || true",
+              "sudo -u ec2-user pm2 delete ecosystem.config.cjs 2>/dev/null || true",
+              "sudo -u ec2-user pm2 start ecosystem.config.cjs",
+              "sudo -u ec2-user pm2 save",
+              "echo \"Deployment complete!\"",
+              "sudo -u ec2-user pm2 status"
+            ]' \
+            --timeout-seconds 600 \
+            --output text \
+            --query 'Command.CommandId')
 
-            # Install/update production dependencies only if needed
-            echo "Checking dependencies..."
-            if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules" ]; then
-              echo "Installing dependencies..."
-              npm install --omit=dev --prefer-offline --no-audit
-            else
-              echo "Dependencies are up to date, skipping install"
-            fi
+          echo "Waiting for application restart..."
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${{ needs.terraform.outputs.instance_id }}" --max-attempts 60
 
-            # Stop existing PM2 processes
-            echo "Restarting application..."
-            pm2 stop ecosystem.config.cjs || true
-            pm2 delete ecosystem.config.cjs || true
-
-            # Start application with PM2
-            pm2 start ecosystem.config.cjs
-
-            # Save PM2 process list
-            pm2 save
-
-            # Display status
-            echo "Deployment complete!"
-            pm2 status
-            pm2 logs --lines 20 --nostream
-          EOF
+          # Show output
+          echo "Application status:"
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ needs.terraform.outputs.instance_id }}" \
+            --query 'StandardOutputContent' \
+            --output text
 
       - name: Verify deployment
         run: |
-          echo "Deployment completed successfully!"
+          echo "✓ Deployment completed successfully!"
+          echo "Instance ID: ${{ needs.terraform.outputs.instance_id }}"
           echo "Instance IP: ${{ needs.terraform.outputs.instance_ip }}"
-          echo "SSH command: ssh -i ~/.ssh/eb-express-key.pem ec2-user@${{ needs.terraform.outputs.instance_ip }}"
+          echo "API URL: https://api.brigid-personal-assistant.com"
+          echo ""
+          echo "To connect via SSM:"
+          echo "  aws ssm start-session --target ${{ needs.terraform.outputs.instance_id }}"

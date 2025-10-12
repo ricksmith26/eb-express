@@ -136,6 +136,12 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_logs" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
+# Attach SSM managed instance core policy (for SSM Session Manager)
+resource "aws_iam_role_policy_attachment" "ssm_managed_instance" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # SSH Key Pair (you'll need to import your existing key or create a new one)
 resource "aws_key_pair" "app_key" {
   key_name   = "${var.app_name}-key"
