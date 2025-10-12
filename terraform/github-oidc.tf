@@ -79,10 +79,14 @@ resource "aws_iam_policy" "github_actions_policy" {
           "iam:GetRole",
           "iam:GetRolePolicy",
           "iam:GetInstanceProfile",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:GetOpenIDConnectProvider",
           "iam:ListAttachedRolePolicies",
           "iam:ListRolePolicies",
           "iam:ListInstanceProfiles",
           "iam:ListInstanceProfilesForRole",
+          "iam:ListPolicyVersions",
           "iam:PassRole",
           "iam:CreateRole",
           "iam:DeleteRole",
@@ -93,11 +97,19 @@ resource "aws_iam_policy" "github_actions_policy" {
           "iam:AddRoleToInstanceProfile",
           "iam:RemoveRoleFromInstanceProfile",
           "iam:TagRole",
-          "iam:TagInstanceProfile"
+          "iam:TagInstanceProfile",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:TagPolicy",
+          "iam:TagOpenIDConnectProvider"
         ]
         Resource = [
           "arn:aws:iam::*:role/${var.app_name}-*",
-          "arn:aws:iam::*:instance-profile/${var.app_name}-*"
+          "arn:aws:iam::*:instance-profile/${var.app_name}-*",
+          "arn:aws:iam::*:policy/${var.app_name}-*",
+          "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
         ]
       },
       {
@@ -106,7 +118,11 @@ resource "aws_iam_policy" "github_actions_policy" {
           "s3:GetObject",
           "s3:PutObject",
           "s3:DeleteObject",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketVersioning",
+          "s3:GetEncryptionConfiguration",
+          "s3:GetBucketPublicAccessBlock"
         ]
         Resource = [
           "arn:aws:s3:::eb-express-terraform-state",
@@ -119,9 +135,22 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:DeleteItem",
-          "dynamodb:DescribeTable"
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:DescribeTimeToLive"
         ]
         Resource = "arn:aws:dynamodb:*:*:table/eb-express-terraform-locks"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:GetHostedZone",
+          "route53:ListHostedZones",
+          "route53:ListResourceRecordSets",
+          "route53:ChangeResourceRecordSets",
+          "route53:GetChange"
+        ]
+        Resource = "*"
       }
     ]
   })
