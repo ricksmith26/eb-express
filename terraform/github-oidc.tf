@@ -104,6 +104,7 @@ resource "aws_iam_policy" "github_actions_policy" {
           "iam:DeletePolicyVersion",
           "iam:CreateOpenIDConnectProvider",
           "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
           "iam:TagPolicy",
           "iam:TagOpenIDConnectProvider"
         ]
