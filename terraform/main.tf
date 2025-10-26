@@ -185,6 +185,10 @@ resource "aws_instance" "app" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [
+      user_data,       # Prevent recreation when user_data script changes
+      ami,             # Prevent recreation when AMI updates (manual updates only)
+    ]
   }
 }
 
