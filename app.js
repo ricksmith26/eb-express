@@ -47,6 +47,7 @@ if (!process.env.FRONTEND_URL) {
 
 const app = express();
 const server = createServer(app);
+app.use('/', indexRouter);
 export const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "*", // Restrict Socket.IO to frontend URL
@@ -110,8 +111,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 connectDB();
-
-app.use('/', indexRouter);
 app.use("/auth", authRoutes);
 app.use('/patients', patientsRouter);
 app.use('/users', usersRouter);
