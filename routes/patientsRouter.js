@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import PatientController from "../controllers/patientController.js";
+import { verifyAccessToken } from "../middleware/auth.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);
@@ -14,8 +15,11 @@ class PatientRoutes {
   }
 
   initializeRoutes() {
-    this.router.get("/email", this.controller.getPatientByEmail); 
-    this.router.get("/", this.controller.getPatients); 
+    // Protected route - requires JWT authentication
+    this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
+
+    // Public/admin routes (you may want to add auth here too)
+    this.router.get("/", this.controller.getPatients);
     this.router.post("/", this.controller.createPatient);
     this.router.put("/:id", this.controller.updatePatient);
     this.router.delete("/:id", this.controller.deletePatient);

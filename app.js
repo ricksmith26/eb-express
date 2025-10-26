@@ -34,23 +34,41 @@ import {socketInit, users} from './socketIo/socketIo.js'
 import {setupAgenda}  from './agenda/agenda.js'
 dotenv.config(dotEnvConfig);
 
+// Validate required environment variables
+if (!process.env.JWT_SECRET) {
+  throw new Error("❌ JWT_SECRET environment variable is required");
+}
+if (!process.env.JWT_REFRESH_SECRET) {
+  console.warn("⚠️  JWT_REFRESH_SECRET not set, using JWT_SECRET (not recommended for production)");
+}
+if (!process.env.FRONTEND_URL) {
+  console.warn("⚠️  FRONTEND_URL not set, CORS will allow all origins (not secure for production)");
+}
 
 const app = express();
 const server = createServer(app);
 export const io = new Server(server, {
   cors: {
-    origin: "*"
+    origin: process.env.FRONTEND_URL || "*", // Restrict Socket.IO to frontend URL
+    credentials: true
   }
 });
 
 app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse proxies
-app.use(
-  cors({
-    // origin: process.env.FRONTEND_URL, // Ensure this matches your frontend URL
-    origin: '*', // Ensure this matches your frontend URL
-    credentials: true, // Allow cookies
-  })
-);
+
+// CORS configuration - restrict to frontend URL for security
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*', // Use FRONTEND_URL if set, otherwise allow all (dev only)
+  credentials: true, // Allow cookies
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+if (!process.env.FRONTEND_URL) {
+  console.warn("⚠️  CORS is allowing all origins - this is insecure for production!");
+}
+
+app.use(cors(corsOptions));
 
 
 app.use(express.json());
@@ -62,13 +80,19 @@ app.use((req, res, next) => {
 });
 
 app.use(session({
-  secret: process.env.JWT_SECRET || "default-secret",
+  secret: process.env.JWT_SECRET, // No fallback - fails fast if not set
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
     mongoUrl: process.env.MONGO_DB_URL,
     collectionName: "sessions",
-  })
+  }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+    httpOnly: true,
+    maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  }
 }));
 
 app.use((req, res, next) => {
