@@ -25,3 +25,18 @@ id_rsa.pub
 # OS files
 .DS_Store
 Thumbs.db
+# Terraform
+*.tfplan
+terraform/*.tfplan
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
+# Old backup files
+*.old
+
+# Initial EB placeholder
+terraform/initial-app/
+terraform/initial-app.zip
+

@@ -1,26 +1,32 @@
-output "instance_id" {
-  description = "ID of the EC2 instance"
-  value       = aws_instance.app.id
+# Elastic Beanstalk outputs
+output "eb_application_name" {
+  description = "Name of the Elastic Beanstalk application"
+  value       = aws_elastic_beanstalk_application.app.name
 }
 
-output "instance_public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_eip.app_eip.public_ip
+output "eb_environment_name" {
+  description = "Name of the Elastic Beanstalk environment"
+  value       = aws_elastic_beanstalk_environment.app_env.name
 }
 
-output "instance_public_dns" {
-  description = "Public DNS name of the EC2 instance"
-  value       = aws_instance.app.public_dns
+output "eb_environment_id" {
+  description = "ID of the Elastic Beanstalk environment"
+  value       = aws_elastic_beanstalk_environment.app_env.id
 }
 
-output "security_group_id" {
-  description = "ID of the security group"
-  value       = aws_security_group.app_sg.id
+output "eb_environment_url" {
+  description = "URL of the Elastic Beanstalk environment"
+  value       = "http://${aws_elastic_beanstalk_environment.app_env.cname}"
 }
 
-output "ssh_command" {
-  description = "SSH command to connect to the instance"
-  value       = "ssh -i ~/.ssh/${var.app_name}-key.pem ec2-user@${aws_eip.app_eip.public_ip}"
+output "eb_cname" {
+  description = "CNAME of the Elastic Beanstalk environment"
+  value       = aws_elastic_beanstalk_environment.app_env.cname
+}
+
+output "s3_bucket_name" {
+  description = "S3 bucket for application versions"
+  value       = aws_s3_bucket.app_versions.id
 }
 
 output "oidc_role_arn" {

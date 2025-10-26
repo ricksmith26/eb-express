@@ -1,0 +1,14 @@
+# Files to exclude from Elastic Beanstalk deployment
+.git
+.gitignore
+.github
+node_modules
+terraform
+.env*
+!.env.example
+*.log
+*.md
+.vscode
+.idea
+bin/deploy.sh
+.DS_Store

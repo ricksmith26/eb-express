@@ -1,0 +1,232 @@
+name: Deploy to Elastic Beanstalk
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  TF_VERSION: 1.9.0
+
+jobs:
+  terraform:
+    name: Terraform Infrastructure
+    runs-on: ubuntu-latest
+    outputs:
+      eb_application_name: ${{ steps.terraform_output.outputs.eb_application_name }}
+      eb_environment_name: ${{ steps.terraform_output.outputs.eb_environment_name }}
+      s3_bucket_name: ${{ steps.terraform_output.outputs.s3_bucket_name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ./terraform
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ./terraform
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        working-directory: ./terraform
+        env:
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_github_org: ${{ github.repository_owner }}
+          TF_VAR_github_repo: ${{ github.event.repository.name }}
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve tfplan
+        working-directory: ./terraform
+
+      - name: Get Terraform Outputs
+        id: terraform_output
+        run: |
+          echo "eb_application_name=$(terraform output -raw eb_application_name)" >> $GITHUB_OUTPUT
+          echo "eb_environment_name=$(terraform output -raw eb_environment_name)" >> $GITHUB_OUTPUT
+          echo "s3_bucket_name=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+        working-directory: ./terraform
+
+  deploy:
+    name: Deploy Application to EB
+    needs: terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create environment file
+        run: |
+          cat > .env.production << 'EOF'
+          NODE_ENV=production
+          PORT=8080
+          MONGO_DB_URL=${{ vars.MONGO_DB_URL || secrets.MONGO_DB_URL }}
+          API_URL=${{ vars.API_URL || secrets.API_URL }}
+          FRONTEND_URL=${{ vars.FRONTEND_URL || secrets.FRONTEND_URL }}
+          GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL=${{ vars.GOOGLE_CALLBACK_URL || secrets.GOOGLE_CALLBACK_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          LIVEKIT_URL=${{ vars.LIVEKIT_URL || secrets.LIVEKIT_URL }}
+          LIVEKIT_API_KEY=${{ vars.LIVEKIT_API_KEY || secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
+          EOF
+
+      - name: Generate deployment package
+        run: |
+          # Create deployment directory
+          mkdir -p deploy
+
+          # Copy application files (respecting .ebignore)
+          rsync -av \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='terraform' \
+            --exclude='.github' \
+            --exclude='deploy' \
+            --exclude='.env*' \
+            --exclude='*.log' \
+            --exclude='*.md' \
+            ./ deploy/
+
+          # Copy .ebextensions
+          cp -r .ebextensions deploy/
+
+          # Copy production env file
+          cp .env.production deploy/.env.local
+
+          # Create deployment zip
+          cd deploy
+          zip -r ../deploy.zip . -x "*.git*"
+          cd ..
+
+          echo "Deployment package size:"
+          ls -lh deploy.zip
+
+      - name: Deploy to Elastic Beanstalk
+        run: |
+          # Generate version label
+          VERSION_LABEL="${{ github.sha }}-$(date +%Y%m%d-%H%M%S)"
+
+          echo "Deploying version: $VERSION_LABEL"
+
+          # Upload to S3
+          aws s3 cp deploy.zip \
+            s3://${{ needs.terraform.outputs.s3_bucket_name }}/versions/$VERSION_LABEL.zip
+
+          # Create application version
+          aws elasticbeanstalk create-application-version \
+            --application-name "${{ needs.terraform.outputs.eb_application_name }}" \
+            --version-label "$VERSION_LABEL" \
+            --source-bundle S3Bucket="${{ needs.terraform.outputs.s3_bucket_name }}",S3Key="versions/$VERSION_LABEL.zip" \
+            --description "Deployed from commit ${{ github.sha }}" \
+            --region ${{ env.AWS_REGION }}
+
+          # Update environment
+          aws elasticbeanstalk update-environment \
+            --application-name "${{ needs.terraform.outputs.eb_application_name }}" \
+            --environment-name "${{ needs.terraform.outputs.eb_environment_name }}" \
+            --version-label "$VERSION_LABEL" \
+            --region ${{ env.AWS_REGION }}
+
+          echo "Deployment initiated. Version: $VERSION_LABEL"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for environment to update..."
+
+          # Wait for environment to be ready (max 15 minutes)
+          for i in {1..90}; do
+            STATUS=$(aws elasticbeanstalk describe-environments \
+              --application-name "${{ needs.terraform.outputs.eb_application_name }}" \
+              --environment-names "${{ needs.terraform.outputs.eb_environment_name }}" \
+              --query 'Environments[0].Status' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            HEALTH=$(aws elasticbeanstalk describe-environments \
+              --application-name "${{ needs.terraform.outputs.eb_application_name }}" \
+              --environment-names "${{ needs.terraform.outputs.eb_environment_name }}" \
+              --query 'Environments[0].Health' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            echo "Status: $STATUS | Health: $HEALTH"
+
+            if [ "$STATUS" = "Ready" ]; then
+              if [ "$HEALTH" = "Green" ] || [ "$HEALTH" = "Yellow" ]; then
+                echo "✓ Deployment successful!"
+                echo "Environment is $STATUS with $HEALTH health"
+                exit 0
+              elif [ "$HEALTH" = "Red" ]; then
+                echo "✗ Deployment failed - environment health is Red"
+                exit 1
+              fi
+            fi
+
+            if [ "$STATUS" = "Terminated" ]; then
+              echo "✗ Environment was terminated"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+          echo "✗ Deployment timed out after 15 minutes"
+          exit 1
+
+      - name: Get environment info
+        if: success()
+        run: |
+          ENV_URL=$(aws elasticbeanstalk describe-environments \
+            --application-name "${{ needs.terraform.outputs.eb_application_name }}" \
+            --environment-names "${{ needs.terraform.outputs.eb_environment_name }}" \
+            --query 'Environments[0].CNAME' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "✓ Deployment completed successfully!"
+          echo ""
+          echo "Environment URL: http://$ENV_URL"
+          echo "Custom Domain: https://api.brigid-personal-assistant.com"
+          echo ""
+          echo "To view logs:"
+          echo "  aws elasticbeanstalk describe-environment-health --environment-name ${{ needs.terraform.outputs.eb_environment_name }} --attribute-names All --region ${{ env.AWS_REGION }}"
