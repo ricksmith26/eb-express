@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import ImagesController from "../controllers/imagesController.js";
+import { verifyAccessToken } from "../middleware/auth.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);
@@ -14,11 +15,11 @@ class ImagesRoutes {
   }
 
   initializeRoutes() {
-    // ✅ Get a single image by file ID and user email
+    // ✅ Get a single image by file ID and user email (public access via email param)
     this.router.get("/image/:fileId/:email", this.imagesController.getImage);
 
-    // ✅ Get all images for authenticated user
-    this.router.get("/all", this.imagesController.getAllImages);
+    // ✅ Get all images for authenticated user (protected route)
+    this.router.get("/all", verifyAccessToken, this.imagesController.getAllImages);
   }
 
   getRouter() {

@@ -25,27 +25,57 @@ class CalendarController {
     return google.calendar({ version: "v3", auth: this.oauth2Client });
   }
 
+  /**
+   * Execute a Google Calendar API call with automatic token refresh on 401/403
+   */
+  async executeWithTokenRefresh(user, apiCall) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      // Check if error is due to expired/invalid token
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        console.log("🔄 Google token expired, refreshing...");
+
+        // Refresh the Google OAuth access token
+        const newAccessToken = await TokenController.refreshAccessToken(user);
+
+        if (!newAccessToken) {
+          throw new Error("Failed to refresh Google access token");
+        }
+
+        console.log("✅ Google token refreshed, retrying request...");
+
+        // Retry the API call with new token
+        return await apiCall();
+      }
+
+      // If not a token error, rethrow
+      throw error;
+    }
+  }
+
   async getCalendarEvents(user, timeMin, timeMax) {
     const calendar = await this.getAuthenticatedCalendar(user);
-    const response = await calendar.events.list({
-      calendarId: "primary",
-      timeMin,
-      timeMax,
-      singleEvents: true,
-      orderBy: "startTime",
+
+    // Wrap API call with auto-refresh
+    return await this.executeWithTokenRefresh(user, async () => {
+      const response = await calendar.events.list({
+        calendarId: "primary",
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: "startTime",
+      });
+      return response.data.items;
     });
-    return response.data.items;
   }
 
   async getTodayEventsData(user) {
-    if (user.refreshToken) {
-      await TokenController.refreshAccessToken(user);
-    }
-
     const now = new Date();
     const startOfDay = new Date(now.setHours(0, 0, 0, 0)).toISOString();
     const endOfDay = new Date(now.setHours(23, 59, 59, 999)).toISOString();
 
+    // getCalendarEvents already handles token refresh automatically
     return await this.getCalendarEvents(user, startOfDay, endOfDay);
   }
 
@@ -71,12 +101,11 @@ class CalendarController {
         return res.status(404).json({ error: "User not found or no access token available" });
       }
 
-      await TokenController.refreshAccessToken(user);
-
       const now = new Date();
       const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).toISOString();
       const endOfWeek = new Date(now.setDate(now.getDate() + (6 - now.getDay()))).toISOString();
 
+      // getCalendarEvents already handles token refresh automatically
       const events = await this.getCalendarEvents(user, startOfWeek, endOfWeek);
       res.json(events);
     } catch (error) {
@@ -99,12 +128,11 @@ class CalendarController {
         return res.status(404).json({ error: "User not found or no access token available" });
       }
 
-      await TokenController.refreshAccessToken(user);
-
       const parsedDate = new Date(date);
       const startOfDay = new Date(parsedDate.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(parsedDate.setHours(23, 59, 59, 999)).toISOString();
 
+      // getCalendarEvents already handles token refresh automatically
       const events = await this.getCalendarEvents(user, startOfDay, endOfDay);
       res.json(events);
     } catch (error) {
@@ -114,7 +142,6 @@ class CalendarController {
   }
 
   async addEvent(req, res) {
-
     const { email, summary, start, end, description, location } = req.body;
 
     if (!email || !summary || !start || !end) {
@@ -123,8 +150,6 @@ class CalendarController {
 
     try {
       const user = await User.findOne({ email });
-      const info = await this.oauth2Client.getTokenInfo(user.accessToken);
-      console.log("✅ Scopes granted:", info.scopes);
       if (!user || !user.refreshToken) {
         return res.status(404).json({ error: "User not found or no refresh token available" });
       }
@@ -139,9 +164,12 @@ class CalendarController {
         end: { dateTime: new Date(end).toISOString(), timeZone: "UTC" },
       };
 
-      const response = await calendar.events.insert({
-        calendarId: "primary",
-        resource: event,
+      // Wrap API call with auto-refresh
+      const response = await this.executeWithTokenRefresh(user, async () => {
+        return await calendar.events.insert({
+          calendarId: "primary",
+          resource: event,
+        });
       });
 
       res.status(201).json({ message: "Event created", event: response.data });
@@ -168,7 +196,6 @@ class CalendarController {
         return res.status(404).json({ error: "User not found or no refresh token available" });
       }
 
-      await TokenController.refreshAccessToken(user);
       const calendar = await this.getAuthenticatedCalendar(user);
 
       // Generate a unique channel ID for this user
@@ -178,15 +205,17 @@ class CalendarController {
       console.log(`📅 Subscribing to calendar updates for ${email}`);
       console.log(`Webhook URL: ${webhookUrl}`);
 
-      // Subscribe to calendar changes using Google Calendar Push Notifications API
-      const response = await calendar.events.watch({
-        calendarId: 'primary',
-        requestBody: {
-          id: channelId,
-          type: 'web_hook',
-          address: webhookUrl,
-          token: user._id.toString(), // Use user ID as verification token
-        },
+      // Wrap API call with auto-refresh
+      const response = await this.executeWithTokenRefresh(user, async () => {
+        return await calendar.events.watch({
+          calendarId: 'primary',
+          requestBody: {
+            id: channelId,
+            type: 'web_hook',
+            address: webhookUrl,
+            token: user._id.toString(), // Use user ID as verification token
+          },
+        });
       });
 
       // Store the channel information in the user document
@@ -231,12 +260,14 @@ class CalendarController {
 
       const calendar = await this.getAuthenticatedCalendar(user);
 
-      // Stop the channel
-      await calendar.channels.stop({
-        requestBody: {
-          id: user.calendarChannelId,
-          resourceId: user.calendarResourceId,
-        },
+      // Wrap API call with auto-refresh
+      await this.executeWithTokenRefresh(user, async () => {
+        return await calendar.channels.stop({
+          requestBody: {
+            id: user.calendarChannelId,
+            resourceId: user.calendarResourceId,
+          },
+        });
       });
 
       // Clear the channel information from the user document

@@ -1,5 +1,4 @@
 import Patient from '../models/PatientSchema.js';
-import { jwtDecode } from "jwt-decode";
 
 class PatientController {
   constructor() {
@@ -47,8 +46,8 @@ class PatientController {
 
   async getPatientByEmail(req, res) {
     try {
-      const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
-      const email = decoded.email;
+      // User is attached by verifyAccessToken middleware
+      const email = req.user.email;
 
       if (!email) {
         return res.status(400).json({ error: "Email is required" });

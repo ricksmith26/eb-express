@@ -1,6 +1,5 @@
 import RelatedPerson from "../models/RelatedPerson.js";
 import Patient from "../models/PatientSchema.js";
-import { jwtDecode } from "jwt-decode";
 
 class RelatedPersonController {
   constructor() {
@@ -103,9 +102,9 @@ class RelatedPersonController {
 
   async getRelatedPersonsByPatientEmail(req, res) {
     try {
-      const decoded = jwtDecode(req.headers.authorization.replace('Bearer ', ''));
+      // User is attached by verifyAccessToken middleware
       const patient = await Patient.findOne({
-        telecom: { $elemMatch: { system: "email", value: decoded.email } }
+        telecom: { $elemMatch: { system: "email", value: req.user.email } }
       });
 
       if (!patient) {
