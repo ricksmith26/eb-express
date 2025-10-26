@@ -1,0 +1,161 @@
+name: Deploy to EB (Simple)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  EB_APP_NAME: eb-express
+  EB_ENV_NAME: eb-express-production
+
+jobs:
+  deploy:
+    name: Deploy to Elastic Beanstalk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create deployment package
+        run: |
+          # Create .env.local with all environment variables
+          cat > .env.local << 'EOF'
+          NODE_ENV=production
+          PORT=8080
+          MONGO_DB_URL=${{ secrets.MONGO_DB_URL || vars.MONGO_DB_URL }}
+          API_URL=${{ vars.API_URL }}
+          FRONTEND_URL=${{ vars.FRONTEND_URL }}
+          GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL=${{ vars.GOOGLE_CALLBACK_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          LIVEKIT_URL=${{ secrets.LIVEKIT_URL }}
+          LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
+          EOF
+
+          # Create deployment zip
+          zip -r deploy.zip . \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x "terraform/*" \
+            -x ".github/*" \
+            -x "*.log" \
+            -x "*.md" \
+            -x ".env"
+
+          echo "✓ Deployment package created"
+          ls -lh deploy.zip
+
+      - name: Generate version label
+        id: version
+        run: |
+          VERSION_LABEL="${{ github.sha }}-$(date +%Y%m%d-%H%M%S)"
+          echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION_LABEL"
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp deploy.zip \
+            s3://eb-express-versions-054037114564/versions/${{ steps.version.outputs.VERSION_LABEL }}.zip
+
+          echo "✓ Uploaded to S3"
+
+      - name: Create application version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name ${{ env.EB_APP_NAME }} \
+            --version-label "${{ steps.version.outputs.VERSION_LABEL }}" \
+            --source-bundle S3Bucket="eb-express-versions-054037114564",S3Key="versions/${{ steps.version.outputs.VERSION_LABEL }}.zip" \
+            --description "Deployed from commit ${{ github.sha }}" \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ Application version created"
+
+      - name: Deploy to environment
+        run: |
+          aws elasticbeanstalk update-environment \
+            --application-name ${{ env.EB_APP_NAME }} \
+            --environment-name ${{ env.EB_ENV_NAME }} \
+            --version-label "${{ steps.version.outputs.VERSION_LABEL }}" \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ Deployment initiated"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to complete..."
+
+          for i in {1..60}; do
+            STATUS=$(aws elasticbeanstalk describe-environments \
+              --application-name ${{ env.EB_APP_NAME }} \
+              --environment-names ${{ env.EB_ENV_NAME }} \
+              --query 'Environments[0].Status' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            HEALTH=$(aws elasticbeanstalk describe-environments \
+              --application-name ${{ env.EB_APP_NAME }} \
+              --environment-names ${{ env.EB_ENV_NAME }} \
+              --query 'Environments[0].Health' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            echo "[$i/60] Status: $STATUS | Health: $HEALTH"
+
+            if [ "$STATUS" = "Ready" ]; then
+              if [ "$HEALTH" = "Green" ]; then
+                echo "✓ Deployment successful!"
+                exit 0
+              elif [ "$HEALTH" = "Red" ]; then
+                echo "✗ Deployment failed - health is Red"
+                aws elasticbeanstalk describe-events \
+                  --environment-name ${{ env.EB_ENV_NAME }} \
+                  --max-items 5 \
+                  --region ${{ env.AWS_REGION }} \
+                  --query 'Events[*].Message' \
+                  --output text
+                exit 1
+              fi
+            fi
+
+            sleep 10
+          done
+
+          echo "✗ Deployment timed out after 10 minutes"
+          exit 1
+
+      - name: Get deployment info
+        if: success()
+        run: |
+          ENV_URL=$(aws elasticbeanstalk describe-environments \
+            --application-name ${{ env.EB_APP_NAME }} \
+            --environment-names ${{ env.EB_ENV_NAME }} \
+            --query 'Environments[0].CNAME' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✓ Deployment completed successfully!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Environment URL: http://$ENV_URL"
+          echo "Custom Domain: https://api.brigid-personal-assistant.com"
+          echo ""
+          echo "Version: ${{ steps.version.outputs.VERSION_LABEL }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
