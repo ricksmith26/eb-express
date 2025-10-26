@@ -12,7 +12,6 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       try {
         let user = await User.findOne({ googleId: profile.id });
-        console.log(user, '<<<<<<<<<<<<<<<< USER')
         if (user) {
           let updated = false;
 
