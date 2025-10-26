@@ -9,9 +9,15 @@ echo "Starting instance initialization..."
 # Update system packages
 yum update -y
 
-# Ensure SSM agent is installed and running (should be pre-installed on AL2023)
+# Install SSM agent (not pre-installed on AL2023)
+echo "Installing SSM agent..."
+yum install -y amazon-ssm-agent
 systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
+
+# Verify SSM agent is running
+systemctl status amazon-ssm-agent --no-pager
+echo "SSM agent installation complete"
 
 # Install Node.js 20.x (LTS)
 curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -

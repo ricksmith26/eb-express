@@ -90,25 +90,63 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Wait for instance to be running
+        run: |
+          echo "Waiting for instance to be in running state..."
+          aws ec2 wait instance-running --instance-ids "${{ needs.terraform.outputs.instance_id }}"
+          echo "✓ Instance is running"
+
       - name: Wait for SSM to be ready
         run: |
           echo "Waiting for SSM agent to be online..."
-          for i in {1..30}; do
-            STATUS=$(aws ssm describe-instance-information \
+          echo "Instance ID: ${{ needs.terraform.outputs.instance_id }}"
+
+          for i in {1..60}; do
+            # Get instance information with better error handling
+            RESULT=$(aws ssm describe-instance-information \
               --filters "Key=InstanceIds,Values=${{ needs.terraform.outputs.instance_id }}" \
               --query 'InstanceInformationList[0].PingStatus' \
-              --output text 2>/dev/null || echo "NotFound")
+              --output text 2>&1 || echo "ERROR")
 
-            if [ "$STATUS" = "Online" ]; then
+            # Check if we got a valid response
+            if [ "$RESULT" = "Online" ]; then
               echo "✓ SSM agent is online!"
               break
             fi
-            echo "Attempt $i/30: SSM status is '$STATUS', waiting..."
+
+            # Show what we got
+            if [ "$RESULT" = "None" ] || [ "$RESULT" = "" ]; then
+              echo "Attempt $i/60: Instance not yet registered with SSM, waiting..."
+            elif [ "$RESULT" = "ERROR" ]; then
+              echo "Attempt $i/60: API error, waiting..."
+            else
+              echo "Attempt $i/60: SSM status is '$RESULT', waiting..."
+            fi
+
             sleep 10
           done
 
-          if [ "$STATUS" != "Online" ]; then
-            echo "ERROR: SSM agent did not come online"
+          # Final check
+          FINAL_STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=${{ needs.terraform.outputs.instance_id }}" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text 2>/dev/null || echo "NotFound")
+
+          if [ "$FINAL_STATUS" != "Online" ]; then
+            echo ""
+            echo "❌ ERROR: SSM agent did not come online after 10 minutes"
+            echo "Final status: $FINAL_STATUS"
+            echo ""
+            echo "Troubleshooting steps:"
+            echo "1. Check instance status:"
+            echo "   aws ec2 describe-instance-status --instance-ids ${{ needs.terraform.outputs.instance_id }}"
+            echo ""
+            echo "2. Check user data script logs:"
+            echo "   aws ssm start-session --target ${{ needs.terraform.outputs.instance_id }}"
+            echo "   sudo cat /var/log/cloud-init-output.log"
+            echo ""
+            echo "3. Check SSM agent status:"
+            echo "   sudo systemctl status amazon-ssm-agent"
             exit 1
           fi
 
