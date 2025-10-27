@@ -10,7 +10,7 @@ import usersRouter from './routes/users.js';
 import patientsRouter from './routes/patientsRouter.js';
 import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import calendarRoutes from "./routes/calendarRoutes.js";
+import calendarRoutes from "./routes/CalendarRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import livekitRoutes from './routes/livekitRoutes.js';
 import webRTCRoutes from './routes/webRTCRoutes.js'
