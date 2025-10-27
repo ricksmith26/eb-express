@@ -12,8 +12,8 @@ import relatedPersonRoutes from "./routes/relatedPersonRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import calendarRoutes from "./routes/CalendarRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
-import livekitRoutes from './routes/livekitRoutes.js';
-import webRTCRoutes from './routes/webRTCRoutes.js'
+import livekitRoutes from './routes/LivekitRoutes.js';
+import webRTCRoutes from './routes/WebRTCRoutes.js'
 import imagesRouter from './routes/imagesRoutes.js';
 import {SpotifyRouter} from './routes/SpotifyRouter.js';
 import AsteriskRoutes from './routes/AsteriskRoutes.js';
