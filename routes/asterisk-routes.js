@@ -1,5 +1,5 @@
 import express from "express";
-import AsteriskController from "../controllers/AsteriskController.js";
+import AsteriskController from "../controllers/asterisk-controller.js";
 
 class AsteriskRoutes {
   constructor() {

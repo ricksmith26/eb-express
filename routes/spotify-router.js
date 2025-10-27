@@ -1,6 +1,6 @@
 // routes/SpotifyRouter.js
 import express from 'express';
-import { SpotifyController } from '../controllers/SpotifyController.js';
+import { SpotifyController } from '../controllers/spotify-controller.js';
 import { SpotifyService } from '../services/SpotifyService.js';
 
 export class SpotifyRouter {

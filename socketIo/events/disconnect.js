@@ -1,6 +1,6 @@
 import { AsteriskCredential } from '../../models/Asterisk.js';
 import { io } from '../../app.js';
-import QueueController from '../../controllers/QueueController.js'
+import QueueController from '../../controllers/queue-controller.js'
 
 const disconnect = (socket, users, agents) => {
     console.log('DISCONNECTION<<<<<<<<', agents)

@@ -1,5 +1,5 @@
 import express from "express";
-import LivekitController from "../controllers/LivekitController.js";
+import LivekitController from "../controllers/livekit-controller.js";
 
 class LivekitRoutes {
   constructor() {

@@ -1,5 +1,5 @@
 import express from "express";
-import WebhookController from "../controllers/WebhookController.js";
+import WebhookController from "../controllers/webhook-controller.js";
 
 class WebhookRoutes {
   constructor() {

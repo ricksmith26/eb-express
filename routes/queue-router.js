@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import QueueController from "../controllers/QueueController.js";
+import QueueController from "../controllers/queue-controller.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);

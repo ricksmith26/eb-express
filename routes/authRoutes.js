@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import AuthController from "../controllers/AuthController.js";
+import AuthController from "../controllers/auth-controller.js";
 import { verifyAccessToken } from "../middleware/auth.js";
 import { dotEnvConfig } from "../config/vars.js";
 

@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import ModeController from "../controllers/ModeController.js";
+import ModeController from "../controllers/mode-controller.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);

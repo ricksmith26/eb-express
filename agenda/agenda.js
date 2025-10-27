@@ -1,5 +1,5 @@
 import Agenda from 'agenda';
-import CalendarController from '../controllers/CalendarController.js'
+import CalendarController from '../controllers/calendar-controller.js'
 import User from '../models/User.js';
 import { users } from '../socketIo/socketIo.js';
 import {io as IO} from '../app.js'
