@@ -53,19 +53,22 @@ class AuthController {
   setAuthCookies(res, accessToken, refreshToken) {
     const isProduction = process.env.NODE_ENV === "production";
 
+    // Cookie options for production (HTTPS with cross-site)
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true, // Always true in production for sameSite: 'none'
+      sameSite: isProduction ? "none" : "lax"
+    };
+
     // Access token cookie (15 minutes)
     res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000 // 15 minutes
     });
 
     // Refresh token cookie (90 days)
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
+      ...cookieOptions,
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
   }
