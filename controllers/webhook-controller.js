@@ -1,4 +1,4 @@
-import CalendarController from './CalendarController.js';
+import CalendarController from './calendar-controller.js';
 import User from '../models/User.js';
 import { scheduleCalendarEvent } from '../agenda/agenda.js';
 import crypto from 'crypto';

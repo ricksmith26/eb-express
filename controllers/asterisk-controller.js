@@ -1,7 +1,7 @@
 import { AsteriskCredential } from '../models/Asterisk.js';
 import { Agents } from '../socketIo/socketIo.js';
 import { io } from '../app.js'
-import QueueController from './QueueController.js';
+import QueueController from './queue-controller.js';
 const updateStatus = async (id, status) => {
   const agent = await AsteriskCredential.findById(id);
 

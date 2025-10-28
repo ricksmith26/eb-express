@@ -2,7 +2,7 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 import fs from "fs";
 import User from "../models/User.js";
-import TokenController from "./TokenController.js";
+import TokenController from "./token-controller.js";
 import { API_URL, dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);
