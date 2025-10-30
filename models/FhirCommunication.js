@@ -177,7 +177,7 @@ FhirCommunicationSchema.index({ 'callMetadata.isEmergency': 1, createdAt: -1 });
 FhirCommunicationSchema.methods.calculateDuration = function() {
   if (this.sent && this.received) {
     const start = this.received.getTime();
-    const end = this.updatedAt.getTime();
+    const end = Date.now(); // Use current time instead of updatedAt
     this.callMetadata.callDuration = Math.floor((end - start) / 1000);
   }
   return this.callMetadata.callDuration;
