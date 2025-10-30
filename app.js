@@ -19,6 +19,7 @@ import {SpotifyRouter} from './routes/spotify-router.js';
 import AsteriskRoutes from './routes/asterisk-routes.js';
 import QueueRoutes from './routes/queue-router.js';
 import modeRouter from './routes/mode-routes.js';
+import callHistoryRoutes from './routes/call-history-routes.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
 import MongoStore from "connect-mongo";
@@ -126,6 +127,7 @@ socketInit(io)
 app.use('/send-webrtc-message', webRTCRoutes);
 app.use('/asterisk', AsteriskRoutes);
 app.use('/queue', QueueRoutes);
+app.use('/call-history', callHistoryRoutes);
 const clientId = 'bc445b54c9a94b649f73f923c675320b';
 const clientSecret = 'e4e50fefcd2a4059a45fade10833f547';
 const redirectUri = `${process.env.FRONTEND_URL}/callback`;

@@ -11,6 +11,7 @@ import message from './events/message.js'
 import emergencyCall from './events/emergencyCall.js'
 import modeChange from './events/modeChange.js'
 import registerAgent from './events/registerAgent.js'
+import rejectCall from './events/rejectCall.js'
 export const users = new Map();
 export const Agents = new Map();
 
@@ -30,17 +31,19 @@ export const socketInit = (io) => {
       offer(socket, users, io)
 
       privateMessage(socket, users, io)
-    
+
       callUser(socket, users, io)
-    
+
       acceptCall(socket, users, io)
-    
+
+      rejectCall(socket, users, io)
+
       hangUp(socket, users, io)
-    
+
       answer(socket, users, io)
-    
+
       iceCandidate(socket, users, io)
-    
+
       disconnect(socket, users, Agents)
 
       message(socket, users)
