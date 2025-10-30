@@ -23,11 +23,17 @@ const callUser = (socket, users, io) => {
                     medium: 'VIDEOCONF'
                 });
 
-                // Emit offer with callId
+                // Emit offer with callId to recipient
                 io.to(recipientSocketId).emit("offer", {
                     from: callerEmail,
                     offer,
                     callId: communication.callMetadata.callId
+                });
+
+                // Send callId back to caller
+                socket.emit("callInitiated", {
+                    callId: communication.callMetadata.callId,
+                    recipientEmail: toEmail
                 });
 
                 console.log(`[CallUser] Call initiated from ${callerEmail} to ${toEmail}, callId: ${communication.callMetadata.callId}`);
