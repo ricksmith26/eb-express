@@ -10,6 +10,7 @@ class RelatedPersonController {
     this.getAllRelatedPersons = this.getAllRelatedPersons.bind(this);
     this.getRelatedPersonsByPatientEmailForAI = this.getRelatedPersonsByPatientEmailForAI.bind(this);
     this.getRelatedPersonsByPatientEmail = this.getRelatedPersonsByPatientEmail.bind(this);
+    this.getContactsByEmail = this.getContactsByEmail.bind(this);
   }
 
   async createRelatedPerson(req, res) {
@@ -117,6 +118,48 @@ class RelatedPersonController {
       res.json(relatedPersons);
     } catch (error) {
       console.error("🚨 Error fetching related persons:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getContactsByEmail(req, res) {
+    try {
+      // Get email from x-user-email header (sent by mobile app)
+      const userEmail = req.headers['x-user-email'];
+
+      if (!userEmail) {
+        return res.status(400).json({ error: "x-user-email header is required" });
+      }
+
+      const patient = await Patient.findOne({
+        telecom: { $elemMatch: { system: "email", value: userEmail } }
+      });
+
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      const patientReference = `Patient/${patient._id}`;
+      const relatedPersons = await RelatedPerson.find({ "patient.reference": patientReference });
+
+      // Format for mobile app - return simple contact list
+      const contacts = relatedPersons.map((person) => {
+        const firstName = person.name?.[0]?.given?.[0] || '';
+        const lastName = person.name?.[0]?.family || '';
+        const emailTelecom = person.telecom?.find(t => t.system === 'email');
+        const phoneTelecom = person.telecom?.find(t => t.system === 'phone');
+
+        return {
+          email: emailTelecom?.value || '',
+          firstName: firstName,
+          lastName: lastName,
+          phoneNumber: phoneTelecom?.value || undefined
+        };
+      });
+
+      res.json(contacts);
+    } catch (error) {
+      console.error("🚨 Error fetching contacts:", error);
       res.status(500).json({ error: error.message });
     }
   }

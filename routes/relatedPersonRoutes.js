@@ -18,6 +18,9 @@ class RelatedPersonRoutes {
     // Protected route - requires JWT authentication
     this.router.get("/getByEmail", verifyAccessToken, this.controller.getRelatedPersonsByPatientEmail);
 
+    // Mobile app route - no auth, uses x-user-email header
+    this.router.get("/contacts", this.controller.getContactsByEmail);
+
     // Other routes (some may need auth too, depending on your requirements)
     this.router.get("/email/ai", this.controller.getRelatedPersonsByPatientEmailForAI);
     this.router.post("/", this.controller.createRelatedPerson);
