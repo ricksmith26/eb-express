@@ -2,7 +2,7 @@
 import axios from 'axios';
 import qs from 'qs';
 import { io } from '../app.js';
-import { users } from '../socketIo/socketIo.js';
+import { getPreferredSocketId } from '../socketIo/socketIo.js';
 
 export class SpotifyController {
   constructor(spotifyService, config) {
@@ -84,21 +84,24 @@ export class SpotifyController {
   async sendSpotifyDataRequest(req, res) {
     const { toEmail, request } = req.body;
     console.log({ toEmail, request });
-  
+
     if (!toEmail || !request) {
       return res.status(400).json({
         error: !toEmail ? 'No toEmail' : 'No request',
       });
     }
-  
+
     try {
       const tracks = await this.spotifyService.searchTracks(request);
-  
-      const recipientSocketId = users.get(toEmail);
+
+      // Use priority routing to get preferred socket ID (web first, then mobile)
+      const recipientSocketId = getPreferredSocketId(toEmail);
       if (recipientSocketId) {
         io.to(recipientSocketId).emit('spotify', { mode: 'spotify', tracks });
+      } else {
+        console.log(`[Spotify] User ${toEmail} is not connected`);
       }
-  
+
       return res.json('ok');
     } catch (error) {
       console.error('Spotify error:', error);

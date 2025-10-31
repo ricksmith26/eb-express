@@ -1,5 +1,5 @@
 import { io } from '../app.js';
-import { users } from '../socketIo/socketIo.js';
+import { getPreferredSocketId } from '../socketIo/socketIo.js';
 
 class ModeController {
   constructor() {
@@ -9,13 +9,17 @@ class ModeController {
   async changeMode(req, res) {
     try {
       const { toEmail, mode } = req.body;
-      const recipientSocketId = users.get(toEmail);
+
+      // Use priority routing to get preferred socket ID (web first, then mobile)
+      const recipientSocketId = getPreferredSocketId(toEmail);
 
       if (!recipientSocketId) {
+        console.log(`[ModeController] User ${toEmail} is not connected`);
         return res.status(404).json({ success: false, message: 'Recipient not connected' });
       }
 
       io.to(recipientSocketId).emit('modeChange', { mode });
+      console.log(`[ModeController] Mode change sent to ${toEmail} on socket ${recipientSocketId}`);
       res.json({ success: true, message: 'Mode change message sent' });
     } catch (error) {
       console.error("❌ Error in changeMode:", error);

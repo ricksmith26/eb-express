@@ -1,7 +1,7 @@
 import Agenda from 'agenda';
 import CalendarController from '../controllers/calendar-controller.js'
 import User from '../models/User.js';
-import { users } from '../socketIo/socketIo.js';
+import { getPreferredSocketId } from '../socketIo/socketIo.js';
 import {io as IO} from '../app.js'
 import moment from 'moment';
 // import { users } from './userStore'; // a list of registered user emails
@@ -84,11 +84,17 @@ export const setupAgenda = async (io) => {
             time: event.start.dateTime
         },'<<<<notify user of event<<')
         try {
-            console.log('sending to:', users.get(email))
-            IO.to(users.get(email)).emit('eventNotification', {
-                title: event.summary,
-                time: moment(event.start.dateTime).format('LT')
-            });
+            // Use priority routing to get preferred socket ID (web first, then mobile)
+            const recipientSocketId = getPreferredSocketId(email);
+            if (recipientSocketId) {
+                console.log('sending to:', recipientSocketId)
+                IO.to(recipientSocketId).emit('eventNotification', {
+                    title: event.summary,
+                    time: moment(event.start.dateTime).format('LT')
+                });
+            } else {
+                console.log(`User ${email} is not connected`);
+            }
         } catch (error) {
             console.log(error)
             throw error
