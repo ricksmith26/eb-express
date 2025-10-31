@@ -1,12 +1,21 @@
-import {getUserEmail} from '../utils/getUserEmail.js'
+import {getUserEmail, getPreferredSocketId, getUserConnections} from '../socketIo.js'
 import callHistoryService from '../../services/call-history-service.js';
 
 const callUser = (socket, users, io) => {
     socket.on("callUser", async ({ toEmail, offer, callerName, recipientName }) => {
         const callerEmail = getUserEmail(socket.id);
-        const recipientSocketId = users.get(toEmail);
+
+        // Use priority routing to get preferred socket ID (web first, then mobile)
+        const recipientSocketId = getPreferredSocketId(toEmail);
+        const recipientConnections = getUserConnections(toEmail);
 
         if (recipientSocketId) {
+            // Find the device type of the preferred connection
+            const preferredConnection = recipientConnections.find(conn => conn.socketId === recipientSocketId);
+            const deviceType = preferredConnection ? preferredConnection.deviceType : 'unknown';
+
+            console.log(`[CallUser] Routing call to ${toEmail} on ${deviceType} device (${recipientSocketId})`);
+            console.log(`[CallUser] Available connections for ${toEmail}:`, recipientConnections.length);
             try {
                 // Create call history record
                 const communication = await callHistoryService.initiateCall({

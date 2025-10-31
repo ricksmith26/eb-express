@@ -77,7 +77,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
-  console.error("📝 PRE Session Middleware Debug: ", req.session);
+  // console.error("📝 PRE Session Middleware Debug: ", req.session);
   next();
 });
 
@@ -98,7 +98,7 @@ app.use(session({
 }));
 
 app.use((req, res, next) => {
-  console.error("📝Session Middleware Debug: ", req.session);
+  // console.error("📝Session Middleware Debug: ", req.session);
   next();
 });
 
@@ -147,7 +147,7 @@ function getUserEmail(socketId) {
 const endpoints = expressListEndpoints(app);
 
 
-console.log(endpoints);
+// console.log(endpoints);
 Sentry.setupExpressErrorHandler(app);
 
 // catch 404 and forward to error handler

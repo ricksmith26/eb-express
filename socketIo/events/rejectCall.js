@@ -1,10 +1,11 @@
-import {getUserEmail} from '../utils/getUserEmail.js'
+import {getUserEmail, getPreferredSocketId} from '../socketIo.js'
 import callHistoryService from '../../services/call-history-service.js';
 
 const rejectCall = (socket, users, io) => {
     socket.on("rejectCall", async ({ from, callId }) => {
         const rejecterEmail = getUserEmail(socket.id);
-        const recipientSocketId = users.get(from);
+        // Use priority routing
+        const recipientSocketId = getPreferredSocketId(from);
 
         try {
             // Update call history to mark as rejected

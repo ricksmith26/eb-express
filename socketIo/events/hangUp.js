@@ -1,10 +1,11 @@
 import callHistoryService from '../../services/call-history-service.js';
-import {getUserEmail} from '../utils/getUserEmail.js'
+import {getUserEmail, getPreferredSocketId} from '../socketIo.js'
 
 const hangUp = (socket, users, io) => {
     socket.on("hangup", async ({ toEmail, callId, endReason, connectionQuality }) => {
         const fromEmail = getUserEmail(socket.id);
-        const recipientSocketId = users.get(toEmail);
+        // Use priority routing
+        const recipientSocketId = getPreferredSocketId(toEmail);
 
         try {
             // Update call history to mark as ended

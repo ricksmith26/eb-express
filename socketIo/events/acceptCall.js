@@ -1,10 +1,11 @@
-import {getUserEmail} from '../utils/getUserEmail.js'
+import {getUserEmail, getPreferredSocketId} from '../socketIo.js'
 import callHistoryService from '../../services/call-history-service.js';
 
 const acceptCall = (socket, users, io) => {
     socket.on("acceptCall", async ({ from, callId }) => {
         const accepterEmail = getUserEmail(socket.id);
-        const recipientSocketId = users.get(from);
+        // Use priority routing
+        const recipientSocketId = getPreferredSocketId(from);
 
         if (recipientSocketId) {
             try {

@@ -1,5 +1,5 @@
 import { io } from '../app.js';
-import { users } from '../socketIo/socketIo.js';
+import { users, getPreferredSocketId, getUserConnections } from '../socketIo/socketIo.js';
 import {AsteriskCredential} from '../models/Asterisk.js'
 
 class WebRTCController {
@@ -18,21 +18,34 @@ class WebRTCController {
     }
 
     try {
-      console.log(`ATTEMPTING WebRTC message sent to ${toEmail}`);
-      const recipientSocketId = users.get(toEmail);
-      const callerSocketId = users.get(fromEmail);
+      console.log(`[WebRTC Controller] Attempting to send WebRTC message to ${toEmail}`);
+
+      // Use priority routing
+      const recipientSocketId = getPreferredSocketId(toEmail);
+      const callerSocketId = getPreferredSocketId(fromEmail);
+
+      const recipientConnections = getUserConnections(toEmail);
+      const callerConnections = getUserConnections(fromEmail);
+
+      console.log(`[WebRTC Controller] Recipient ${toEmail} has ${recipientConnections.length} connection(s)`);
+      console.log(`[WebRTC Controller] Caller ${fromEmail} has ${callerConnections.length} connection(s)`);
 
       if (recipientSocketId) {
         io.to(recipientSocketId).emit('message', { type: 'WEBRTC', message, fromEmail });
-        io.to(callerSocketId).emit('message', { type: 'WEBRTC', message, toEmail });
-        console.log(`WebRTC message sent to ${toEmail}`);
+        console.log(`[WebRTC Controller] Message sent to recipient ${toEmail} on socket ${recipientSocketId}`);
+
+        if (callerSocketId) {
+          io.to(callerSocketId).emit('message', { type: 'WEBRTC', message, toEmail });
+          console.log(`[WebRTC Controller] Message sent to caller ${fromEmail} on socket ${callerSocketId}`);
+        }
+
         return res.json({ success: true, message: 'Message sent' });
       } else {
-        console.log(`User ${toEmail} is not connected`);
+        console.log(`[WebRTC Controller] User ${toEmail} is not connected`);
         return res.status(404).json({ error: 'User is not connected' });
       }
     } catch (error) {
-      console.error(error);
+      console.error('[WebRTC Controller] Error:', error);
       res.status(500).json({ error: 'Failed to send WebRTC message' });
     }
   }
@@ -41,12 +54,19 @@ class WebRTCController {
     const { toEmail } = req.body;
 
     try {
-      const recipientSocketId = users.get(toEmail);
-      io.to(recipientSocketId).emit('emergencyCall');
-      console.log(`Emergency Call message sent to ${toEmail}`);
-      return res.json({ success: true, message: 'Message sent' });
+      // Use priority routing
+      const recipientSocketId = getPreferredSocketId(toEmail);
+
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('emergencyCall');
+        console.log(`[WebRTC Controller] Emergency call message sent to ${toEmail}`);
+        return res.json({ success: true, message: 'Message sent' });
+      } else {
+        console.log(`[WebRTC Controller] User ${toEmail} is not connected`);
+        return res.status(404).json({ error: 'User is not connected' });
+      }
     } catch (error) {
-      console.error(error);
+      console.error('[WebRTC Controller] Error:', error);
       res.status(500).json({ error: 'Failed to send emergency call' });
     }
   }
