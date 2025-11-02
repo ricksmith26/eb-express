@@ -26,9 +26,23 @@ passport.use(
             updated = true;
           }
 
+          // ✅ Update name if it has changed
+          const profileName = profile.displayName || profile.name?.givenName + ' ' + profile.name?.familyName;
+          if (profileName && user.name !== profileName) {
+            user.name = profileName;
+            updated = true;
+          }
+
+          // ✅ Update picture if it has changed
+          const profilePicture = profile.photos?.[0]?.value;
+          if (profilePicture && user.picture !== profilePicture) {
+            user.picture = profilePicture;
+            updated = true;
+          }
+
           if (updated) {
             await user.save();
-            console.log("🔁 Updated user tokens");
+            console.log("🔁 Updated user profile");
           }
 
           return done(null, user);
@@ -37,7 +51,9 @@ passport.use(
         // ✅ Create new user
         user = await User.create({
           googleId: profile.id,
+          name: profile.displayName || profile.name?.givenName + ' ' + profile.name?.familyName,
           email: profile.emails[0].value,
+          picture: profile.photos?.[0]?.value,
           accessToken,
           refreshToken,
         });
