@@ -1,6 +1,6 @@
-import { google } from "googleapis";
+import { drive } from "@googleapis/drive";
+import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
-import fs from "fs";
 import User from "../models/User.js";
 import TokenController from "./token-controller.js";
 import { API_URL, dotEnvConfig } from "../config/vars.js";
@@ -9,7 +9,7 @@ dotenv.config(dotEnvConfig);
 
 class ImagesController {
   constructor() {
-    this.auth = new google.auth.OAuth2(
+    this.auth = new OAuth2Client(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       "urn:ietf:wg:oauth:2.0:oob"
@@ -23,8 +23,7 @@ class ImagesController {
 
   async getDriveInstance(user) {
     this.auth.setCredentials({ refresh_token: user.refreshToken });
-    google.options({ auth: this.auth });
-    return google.drive({ version: "v3", auth: this.auth });
+    return drive({ version: "v3", auth: this.auth });
   }
 
   /**

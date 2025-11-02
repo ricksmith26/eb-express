@@ -1,14 +1,38 @@
-# Files to exclude from Elastic Beanstalk deployment
-.git
-.gitignore
-.github
-node_modules
-terraform
-.env*
-!.env.example
-*.log
+# Documentation (keep only README.md)
 *.md
-.vscode
-.idea
-bin/deploy.sh
+!README.md
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Old backup files
+*.old
+
+# Git
+.git/
+.github/
+
+# Terraform files
+terraform/
+*.tfplan
+*.tfstate
+*.tfstate.*
+
+# Scripts and tools
+scripts/
+setup-github-oidc.sh
+
+# Development files
+nodemon.json
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+test/
+*.test.js
+*.spec.js

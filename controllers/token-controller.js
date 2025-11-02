@@ -1,9 +1,9 @@
-import { google } from "googleapis";
+import { OAuth2Client } from "google-auth-library";
 
 const TokenController = {
       async refreshAccessToken(user) {
             try {
-              const auth = new google.auth.OAuth2(
+              const auth = new OAuth2Client(
                 process.env.GOOGLE_CLIENT_ID,
                 process.env.GOOGLE_CLIENT_SECRET,
                 process.env.GOOGLE_CALLBACK_URL

@@ -2,8 +2,8 @@
 
 # Set variables
 EC2_USER="ec2-user"
-EC2_IP="18.175.192.81"  # Replace with your EC2 public IP
-PEM_KEY="~/.ssh/ai-fhir-server.pem"  # Path to your SSH key
+EC2_IP="35.177.7.255"  # Replace with your EC2 public IP
+PEM_KEY="~/.ssh/eb-express-key"  # Path to your SSH key
 APP_DIR="/home/ec2-user/eb-express"  # Directory on EC2
 
 echo "🚀 Deploying to EC2 ($EC2_IP)..."

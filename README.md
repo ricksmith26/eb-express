@@ -243,6 +243,21 @@ Local server runs on: http://localhost:3000
 - MongoDB credentials use restricted access
 - CORS is configured to only allow requests from `FRONTEND_URL`
 
+## Known Issues
+
+### Session Persistence After Server Restart
+Users are logged out when the server restarts because sessions are stored in memory using express-session with in-memory store.
+
+**Solutions:**
+1. Use connect-mongo to store sessions in MongoDB (recommended)
+2. Use Redis/Memcached for session storage
+3. Switch to stateless JWT-only authentication
+
+## Additional Documentation
+
+- **Call History Feature**: See [docs/call-history.md](docs/call-history.md) for WebRTC call tracking implementation
+- **Archived Deployment Docs**: See `docs/` directory for historical deployment guides
+
 ## Support
 
 For issues or questions:

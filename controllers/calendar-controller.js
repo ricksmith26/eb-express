@@ -1,4 +1,5 @@
-import { google } from "googleapis";
+import { calendar } from "@googleapis/calendar";
+import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
 import User from '../models/User.js';
 import TokenController from './token-controller.js';
@@ -7,7 +8,7 @@ dotenv.config(dotEnvConfig);
 
 class CalendarController {
   constructor() {
-    this.oauth2Client = new google.auth.OAuth2(
+    this.oauth2Client = new OAuth2Client(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_CALLBACK_URL
@@ -22,7 +23,7 @@ class CalendarController {
 
   async getAuthenticatedCalendar(user) {
     this.oauth2Client.setCredentials({ refresh_token: user.refreshToken });
-    return google.calendar({ version: "v3", auth: this.oauth2Client });
+    return calendar({ version: "v3", auth: this.oauth2Client });
   }
 
   /**
