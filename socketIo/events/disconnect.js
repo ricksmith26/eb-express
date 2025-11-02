@@ -43,10 +43,11 @@ const disconnect = (socket, users, agents) => {
             if (id === socket.id) {
                 QueueController.removeAgentFromQueue(username)
                 agents.delete(username);
-                console.log('agents shoul be empty>>>', agents)
+                console.log('agents should be empty>>>', agents)
                 const agent = await AsteriskCredential.findOne({ username });
                 if (!agent) {
-                    return res.status(404).json({ error: 'Agent not found' });
+                    console.error(`Agent not found during disconnect: ${username}`);
+                    break;
                 }
                 agent.status = 'INACTIVE';
                 await agent.save();

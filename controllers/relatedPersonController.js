@@ -1,5 +1,6 @@
 import RelatedPerson from "../models/RelatedPerson.js";
 import Patient from "../models/PatientSchema.js";
+import User from "../models/User.js";
 
 class RelatedPersonController {
   constructor() {
@@ -142,20 +143,31 @@ class RelatedPersonController {
       const patientReference = `Patient/${patient._id}`;
       const relatedPersons = await RelatedPerson.find({ "patient.reference": patientReference });
 
-      // Format for mobile app - return simple contact list
-      const contacts = relatedPersons.map((person) => {
+      // Format for mobile app - return simple contact list with profile photos
+      const contacts = await Promise.all(relatedPersons.map(async (person) => {
         const firstName = person.name?.[0]?.given?.[0] || '';
         const lastName = person.name?.[0]?.family || '';
         const emailTelecom = person.telecom?.find(t => t.system === 'email');
         const phoneTelecom = person.telecom?.find(t => t.system === 'phone');
+        const contactEmail = emailTelecom?.value || '';
+
+        // Look up user by email to get profile picture
+        let profilePhoto = null;
+        if (contactEmail) {
+          const user = await User.findOne({ email: contactEmail });
+          if (user && user.picture) {
+            profilePhoto = user.picture;
+          }
+        }
 
         return {
-          email: emailTelecom?.value || '',
+          email: contactEmail,
           firstName: firstName,
           lastName: lastName,
-          phoneNumber: phoneTelecom?.value || undefined
+          phoneNumber: phoneTelecom?.value || undefined,
+          profilePhoto: profilePhoto
         };
-      });
+      }));
 
       res.json(contacts);
     } catch (error) {

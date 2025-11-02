@@ -10,18 +10,23 @@ echo "Setting Environment Variables"
 echo "=========================================="
 echo ""
 
-# Check if .env.local exists
-if [ ! -f .env.local ]; then
-  echo "❌ Error: .env.local file not found!"
-  echo "Please create .env.local with your environment variables first."
+# Check if .env exists
+if [ ! -f .env ]; then
+  echo "❌ Error: .env file not found!"
+  echo "Please create .env with your environment variables first."
   exit 1
 fi
 
-# Source the .env.local file
-source .env.local
+# Source the .env file and export variables
+set -a
+source .env
+set +a
 
 echo "Setting environment variables for brigid-api-prod..."
 echo ""
+
+# Update Google callback URL to use API domain
+GOOGLE_CALLBACK_URL="https://api.brigid-personal-assistant.com/auth/google/callback"
 
 ~/.local/bin/eb setenv \
   NODE_ENV=production \
