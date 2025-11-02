@@ -25,7 +25,13 @@ Backend API for Brigid Personal Assistant, deployed on AWS Elastic Beanstalk.
 For day-to-day code changes, simply run:
 
 ```bash
-eb deploy
+~/.local/bin/eb deploy
+```
+
+Or use the npm script:
+
+```bash
+npm run deploy
 ```
 
 This automatically deploys:
@@ -63,19 +69,19 @@ You only need to update environment variables when changing configuration (not c
 **Option 1: AWS CLI** (Recommended - fastest)
 ```bash
 aws elasticbeanstalk update-environment \
-  --environment-name eb-express-prod \
+  --environment-name brigid-api-prod \
   --option-settings \
     Namespace=aws:elasticbeanstalk:application:environment,OptionName=VARIABLE_NAME,Value="new_value"
 ```
 
 **Option 2: EB CLI**
 ```bash
-eb setenv VARIABLE_NAME="new_value"
+~/.local/bin/eb setenv VARIABLE_NAME="new_value"
 ```
 
 **Option 3: AWS Console**
 1. Go to AWS Elastic Beanstalk Console
-2. Select `eb-express-prod` environment
+2. Select `brigid-api-prod` environment
 3. Configuration → Software → Edit
 4. Update Environment properties
 5. Apply
@@ -91,19 +97,19 @@ If you need to set up a new environment from scratch:
 
 2. **Initialize EB**
    ```bash
-   eb init -p "Node.js 20" eb-express --region eu-west-2
+   ~/.local/bin/eb init -p "Node.js 20" brigid-api --region eu-west-2
    ```
 
 3. **Create Environment**
    ```bash
-   eb create eb-express-prod --single --instance-type t3.micro
+   ~/.local/bin/eb create brigid-api-prod --single --instance-type t3.micro
    ```
 
 4. **Set Environment Variables** (use one of the methods above)
 
 5. **Deploy**
    ```bash
-   eb deploy
+   ~/.local/bin/eb deploy
    ```
 
 ## HTTPS/SSL Configuration
@@ -129,22 +135,22 @@ sudo systemctl reload nginx
 
 ### Check Environment Status
 ```bash
-eb status
+~/.local/bin/eb status
 ```
 
 ### View Logs
 ```bash
-eb logs
+~/.local/bin/eb logs
 ```
 
 ### SSH into Instance
 ```bash
-eb ssh
+~/.local/bin/eb ssh
 ```
 
 ### Monitor Health
 ```bash
-eb health --refresh
+~/.local/bin/eb health --refresh
 ```
 
 ## Project Structure
@@ -186,7 +192,7 @@ The production environment is **Single Instance** (not Load Balanced):
 ### DNS Configuration
 The custom domain `api.brigid-personal-assistant.com` is configured via Route53 CNAME:
 ```
-api.brigid-personal-assistant.com → eb-express-prod.eba-hm6qmamz.eu-west-2.elasticbeanstalk.com
+api.brigid-personal-assistant.com → brigid-api-prod.eba-thgvfr9n.eu-west-2.elasticbeanstalk.com
 ```
 
 ## Troubleshooting
@@ -194,16 +200,16 @@ api.brigid-personal-assistant.com → eb-express-prod.eba-hm6qmamz.eu-west-2.ela
 ### Deployment Fails
 ```bash
 # Check recent events
-eb events --follow
+~/.local/bin/eb events --follow
 
 # View logs
-eb logs --all
+~/.local/bin/eb logs --all
 ```
 
 ### HTTPS Not Working
 ```bash
 # SSH into instance and check certificate
-eb ssh
+~/.local/bin/eb ssh
 sudo ls -la /etc/letsencrypt/live/api.brigid-personal-assistant.com/
 sudo nginx -t
 sudo systemctl status nginx
@@ -212,7 +218,7 @@ sudo systemctl status nginx
 ### Application Crashes
 ```bash
 # Check application logs
-eb ssh
+~/.local/bin/eb ssh
 sudo tail -f /var/log/web.stdout.log
 ```
 
@@ -261,6 +267,6 @@ Users are logged out when the server restarts because sessions are stored in mem
 ## Support
 
 For issues or questions:
-- Check AWS Elastic Beanstalk logs: `eb logs`
+- Check AWS Elastic Beanstalk logs: `~/.local/bin/eb logs`
 - Check CloudWatch Logs in AWS Console
-- SSH into instance for debugging: `eb ssh`
+- SSH into instance for debugging: `~/.local/bin/eb ssh`
