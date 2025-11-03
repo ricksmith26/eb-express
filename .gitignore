@@ -39,5 +39,3 @@ terraform/*.tfstate.backup
 # Initial EB placeholder
 terraform/initial-app/
 terraform/initial-app.zip
-
-firebase-service-account.json
