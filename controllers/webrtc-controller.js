@@ -1,6 +1,8 @@
 import { io } from '../app.js';
 import { users, getPreferredSocketId, getUserConnections } from '../socketIo/socketIo.js';
 import {AsteriskCredential} from '../models/Asterisk.js'
+import User from '../models/User.js';
+import { sendCallNotification } from '../services/pushNotificationService.js';
 
 class WebRTCController {
   constructor() {
@@ -41,8 +43,36 @@ class WebRTCController {
 
         return res.json({ success: true, message: 'Message sent' });
       } else {
-        console.log(`[WebRTC Controller] User ${toEmail} is not connected`);
-        return res.status(404).json({ error: 'User is not connected' });
+        console.log(`[WebRTC Controller] User ${toEmail} is not connected - attempting push notification`);
+
+        try {
+          // User is offline - send push notification
+          const recipient = await User.findOne({ email: toEmail });
+
+          if (recipient && recipient.pushNotificationTokens && recipient.pushNotificationTokens.length > 0) {
+            console.log(`[WebRTC Controller] Sending push notification to ${toEmail} (${recipient.pushNotificationTokens.length} tokens)`);
+
+            // Send push notification
+            await sendCallNotification(
+              recipient.pushNotificationTokens,
+              {
+                fromEmail: fromEmail,
+                fromName: fromEmail, // We don't have the caller's name in this endpoint
+                callId: '', // No callId in this flow
+                offer: null
+              }
+            );
+
+            console.log(`[WebRTC Controller] Push notification sent successfully to ${toEmail}`);
+            return res.json({ success: true, message: 'Push notification sent', offline: true });
+          } else {
+            console.log(`[WebRTC Controller] No push tokens registered for ${toEmail}`);
+            return res.status(404).json({ error: 'User is not connected' });
+          }
+        } catch (error) {
+          console.error(`[WebRTC Controller] Error sending push notification:`, error);
+          return res.status(404).json({ error: 'User is not connected' });
+        }
       }
     } catch (error) {
       console.error('[WebRTC Controller] Error:', error);
