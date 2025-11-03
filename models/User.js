@@ -12,6 +12,15 @@ const userSchema = new mongoose.Schema({
   calendarChannelId: String, // For Google Calendar webhook notifications
   calendarResourceId: String, // For Google Calendar webhook notifications
   calendarChannelExpiration: Date, // When the webhook subscription expires
+  pushNotificationTokens: [
+    {
+      token: { type: String, required: true },
+      platform: { type: String, enum: ['ios', 'android', 'web'], required: true },
+      deviceType: { type: String, enum: ['mobile', 'web', 'unknown'], default: 'mobile' },
+      registeredAt: { type: Date, default: Date.now },
+      lastUsedAt: { type: Date, default: Date.now },
+    },
+  ],
   createdAt: { type: Date, default: Date.now },
 });
 

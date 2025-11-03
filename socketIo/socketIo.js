@@ -12,6 +12,7 @@ import emergencyCall from './events/emergencyCall.js'
 import modeChange from './events/modeChange.js'
 import registerAgent from './events/registerAgent.js'
 import rejectCall from './events/rejectCall.js'
+import registerPushToken from './events/registerPushToken.js'
 
 // Change from Map<email, socketId> to Map<email, Array<{socketId, deviceType}>>
 export const users = new Map();
@@ -79,6 +80,8 @@ export const socketInit = (io) => {
     io.on('connection', (socket) => {
       console.log(`⚡: ${socket.id} user just connected!`);
       register(socket, users)
+
+      registerPushToken(socket, users)
 
       offer(socket, users, io)
 

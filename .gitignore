@@ -40,3 +40,4 @@ terraform/*.tfstate.backup
 terraform/initial-app/
 terraform/initial-app.zip
 
+FirebaseCredentials/firebase-service-account.json
