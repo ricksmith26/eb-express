@@ -73,13 +73,6 @@ export async function sendCallNotification(pushTokens, callData) {
             sound: 'default',
             priority: 'max',
             defaultVibrateTimings: true,
-            visibility: 'public',
-            tag: callId,
-            sticky: true,
-            // Full screen intent - shows as overlay on locked screen like a phone call
-            // This makes Android display the notification as a high-priority heads-up notification
-            notificationCount: 1,
-            timeoutAfter: 60000, // Auto-dismiss after 60 seconds if not answered
           },
         },
         apns: {
