@@ -52,20 +52,28 @@ export async function sendCallNotification(pushTokens, callData) {
 
   for (const pushToken of pushTokens) {
     try {
-      // Send data-only message for calls so the app can show a full-screen call UI
+      // Send notification+data message so it shows even when app is killed
       const message = {
         token: pushToken.token,
+        notification: {
+          title: `Incoming call from ${fromName || fromEmail}`,
+          body: 'Tap to answer',
+        },
         data: {
           type: 'webrtc_call',
           callId: callId || '',
           fromEmail: fromEmail || '',
           fromName: fromName || '',
           offer: offer ? JSON.stringify(offer) : '',
-          title: `Incoming call from ${fromName || fromEmail}`,
-          body: 'Tap to answer',
         },
         android: {
           priority: 'high',
+          notification: {
+            channelId: 'calls',
+            sound: 'default',
+            priority: 'max',
+            defaultVibrateTimings: true,
+          },
         },
         apns: {
           payload: {
