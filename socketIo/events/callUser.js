@@ -48,6 +48,29 @@ const callUser = (socket, users, io) => {
                 });
 
                 console.log(`[CallUser] Call initiated from ${callerEmail} to ${toEmail}, callId: ${communication.callMetadata.callId}`);
+
+                // BACKUP: Always send push notification to mobile devices
+                // This ensures delivery even if socket is stale/disconnected
+                if (deviceType === 'mobile') {
+                    try {
+                        const recipient = await User.findOne({ email: toEmail });
+                        if (recipient && recipient.pushNotificationTokens && recipient.pushNotificationTokens.length > 0) {
+                            console.log(`[CallUser] Sending backup push notification to mobile device (${recipient.pushNotificationTokens.length} tokens)`);
+                            await sendCallNotification(
+                                recipient.pushNotificationTokens,
+                                {
+                                    fromEmail: callerEmail,
+                                    fromName: callerName || callerEmail,
+                                    callId: communication.callMetadata.callId,
+                                    offer
+                                }
+                            );
+                            console.log(`[CallUser] Backup push notification sent`);
+                        }
+                    } catch (pushError) {
+                        console.error(`[CallUser] Error sending backup push notification:`, pushError);
+                    }
+                }
             } catch (error) {
                 console.error(`[CallUser] Error creating call history:`, error);
                 // Still emit the offer even if history logging fails
