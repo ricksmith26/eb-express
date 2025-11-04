@@ -42,6 +42,7 @@ initializeFirebase();
  * @returns {Promise<Array>} Array of message IDs
  */
 export async function sendCallNotification(pushTokens, callData) {
+  console.log(callData, '<<<callData<<')
   if (!firebaseInitialized) {
     console.error('[PushNotificationService] Firebase not initialized, cannot send notification');
     return [];
@@ -52,7 +53,7 @@ export async function sendCallNotification(pushTokens, callData) {
 
   for (const pushToken of pushTokens) {
     try {
-      // Send notification+data message so it shows even when app is killed
+      // Send notification+data message so it shows when app is killed/background
       const message = {
         token: pushToken.token,
         notification: {
@@ -73,6 +74,8 @@ export async function sendCallNotification(pushTokens, callData) {
             sound: 'default',
             priority: 'max',
             defaultVibrateTimings: true,
+            sticky: true,
+            tag: 'call',
           },
         },
         apns: {
