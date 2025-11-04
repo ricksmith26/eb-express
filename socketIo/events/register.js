@@ -1,8 +1,10 @@
+import { getPendingCall, removePendingCall, getPreferredSocketId } from '../socketIo.js';
+
 /**
  * Register a user's socket connection with optional device type
  * Supports both legacy format (email only) and new format ({email, deviceType})
  */
-const register = (socket, users) => {
+const register = (socket, users, io) => {
     socket.on('register', (data) => {
         let email, deviceType;
 
@@ -58,6 +60,39 @@ const register = (socket, users) => {
         connections.forEach(conn => {
             console.log(`  - ${conn.socketId} (${conn.deviceType})`);
         });
+
+        // Check for pending calls
+        const pendingCall = getPendingCall(email);
+
+        if (pendingCall) {
+            console.log(`[Register] Found pending call for ${email} from ${pendingCall.callerEmail}`);
+
+            // Get caller's socket
+            const callerSocketId = getPreferredSocketId(pendingCall.callerEmail);
+
+            if (callerSocketId) {
+                // Notify caller that recipient is now available
+                io.to(callerSocketId).emit('recipient_available', {
+                    recipientEmail: email,
+                    message: 'Recipient is now online, initiating call'
+                });
+
+                // Notify recipient about incoming call
+                io.to(socket.id).emit('message', {
+                    type: 'WEBRTC',
+                    fromEmail: pendingCall.callerEmail,
+                    message: pendingCall.metadata?.message || 'call'
+                });
+
+                console.log(`[Register] Initiated call between ${pendingCall.callerEmail} and ${email}`);
+            } else {
+                console.log(`[Register] Caller ${pendingCall.callerEmail} is no longer online`);
+                // Optionally notify recipient that caller is gone
+            }
+
+            // Remove from queue
+            removePendingCall(email);
+        }
     });
 }
 

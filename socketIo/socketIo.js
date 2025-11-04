@@ -13,10 +13,16 @@ import modeChange from './events/modeChange.js'
 import registerAgent from './events/registerAgent.js'
 import rejectCall from './events/rejectCall.js'
 import registerPushToken from './events/registerPushToken.js'
+import declineCall from './events/declineCall.js'
+import cancelCall from './events/cancelCall.js'
 
 // Change from Map<email, socketId> to Map<email, Array<{socketId, deviceType}>>
 export const users = new Map();
 export const Agents = new Map();
+
+// Pending calls queue for offline recipients
+// Structure: Map<recipientEmail, { callerEmail, timestamp, metadata }>
+export const pendingCalls = new Map();
 
 /**
  * Get user email by socket ID
@@ -76,10 +82,66 @@ export function getPreferredSocketId(email) {
     return connections[0].socketId;
   }
 
+/**
+ * Add a pending call to the queue
+ * @param {string} recipientEmail - Email of the call recipient
+ * @param {string} callerEmail - Email of the caller
+ * @param {object} metadata - Additional call metadata
+ */
+export function addPendingCall(recipientEmail, callerEmail, metadata = {}) {
+    pendingCalls.set(recipientEmail, {
+      callerEmail,
+      timestamp: Date.now(),
+      ...metadata
+    });
+    console.log(`[CallQueue] Added pending call: ${callerEmail} -> ${recipientEmail}`);
+  }
+
+/**
+ * Get pending call for a recipient
+ * @param {string} recipientEmail - Email of the recipient
+ * @returns {object|null} - Pending call data or null if none exists
+ */
+export function getPendingCall(recipientEmail) {
+    return pendingCalls.get(recipientEmail);
+  }
+
+/**
+ * Remove a pending call from the queue
+ * @param {string} recipientEmail - Email of the recipient
+ * @returns {boolean} - True if call was removed, false if none existed
+ */
+export function removePendingCall(recipientEmail) {
+    const existed = pendingCalls.has(recipientEmail);
+    pendingCalls.delete(recipientEmail);
+    if (existed) {
+      console.log(`[CallQueue] Removed pending call for ${recipientEmail}`);
+    }
+    return existed;
+  }
+
+/**
+ * Cleanup stale pending calls (older than 5 minutes)
+ */
+export function cleanupStaleCalls() {
+    const MAX_AGE = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+
+    for (const [email, call] of pendingCalls.entries()) {
+      if (now - call.timestamp > MAX_AGE) {
+        pendingCalls.delete(email);
+        console.log(`[CallQueue] Removed stale call for ${email}`);
+      }
+    }
+  }
+
+// Run cleanup every minute
+setInterval(cleanupStaleCalls, 60000);
+
 export const socketInit = (io) => {
     io.on('connection', (socket) => {
       console.log(`⚡: ${socket.id} user just connected!`);
-      register(socket, users)
+      register(socket, users, io)
 
       registerPushToken(socket, users)
 
@@ -106,6 +168,10 @@ export const socketInit = (io) => {
       emergencyCall(socket, users, io)
 
       modeChange(socket, users, io)
+
+      declineCall(socket, users, io)
+
+      cancelCall(socket, users, io)
 
       // agentStatusChange(socket, Agents, agent, stat)
 

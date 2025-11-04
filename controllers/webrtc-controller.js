@@ -1,5 +1,5 @@
 import { io } from '../app.js';
-import { users, getPreferredSocketId, getUserConnections } from '../socketIo/socketIo.js';
+import { users, getPreferredSocketId, getUserConnections, addPendingCall } from '../socketIo/socketIo.js';
 import {AsteriskCredential} from '../models/Asterisk.js'
 import User from '../models/User.js';
 import { sendCallNotification } from '../services/pushNotificationService.js';
@@ -43,34 +43,42 @@ class WebRTCController {
 
         return res.json({ success: true, message: 'Message sent' });
       } else {
-        console.log(`[WebRTC Controller] User ${toEmail} is not connected - attempting push notification`);
+        console.log(`[WebRTC Controller] User ${toEmail} is not connected - queueing call and sending push notification`);
 
         try {
-          // User is offline - send push notification
+          // User is offline - queue call and send push notification
           const recipient = await User.findOne({ email: toEmail });
 
           if (recipient && recipient.pushNotificationTokens && recipient.pushNotificationTokens.length > 0) {
-            console.log(`[WebRTC Controller] Sending push notification to ${toEmail} (${recipient.pushNotificationTokens.length} tokens)`);
+            console.log(`[WebRTC Controller] Queueing call and sending push notification to ${toEmail} (${recipient.pushNotificationTokens.length} tokens)`);
 
-            // Send push notification
+            // Add to pending calls queue
+            addPendingCall(toEmail, fromEmail, { message });
+
+            // Send basic push notification (no callId/offer needed - WebRTC setup happens when they connect)
             await sendCallNotification(
               recipient.pushNotificationTokens,
               {
                 fromEmail: fromEmail,
                 fromName: fromEmail, // We don't have the caller's name in this endpoint
-                callId: '', // No callId in this flow
-                offer: null
+                // Note: callId and offer intentionally omitted - will be set when recipient connects
               }
             );
 
-            console.log(`[WebRTC Controller] Push notification sent successfully to ${toEmail}`);
-            return res.json({ success: true, message: 'Push notification sent', offline: true });
+            console.log(`[WebRTC Controller] Call queued and push notification sent successfully to ${toEmail}`);
+            return res.json({
+              success: true,
+              message: 'Call queued, push notification sent',
+              queued: true,
+              recipientEmail: toEmail,
+              offline: true
+            });
           } else {
             console.log(`[WebRTC Controller] No push tokens registered for ${toEmail}`);
             return res.status(404).json({ error: 'User is not connected' });
           }
         } catch (error) {
-          console.error(`[WebRTC Controller] Error sending push notification:`, error);
+          console.error(`[WebRTC Controller] Error queueing call and sending push notification:`, error);
           return res.status(404).json({ error: 'User is not connected' });
         }
       }
