@@ -21,6 +21,35 @@ const userSchema = new mongoose.Schema({
       lastUsedAt: { type: Date, default: Date.now },
     },
   ],
+
+  // Withings Integration
+  withingsAccessToken: {
+    type: String,
+    select: false // Don't include in default queries for security
+  },
+  withingsRefreshToken: {
+    type: String,
+    select: false
+  },
+  withingsTokenExpiry: Date,
+  withingsUserId: String,
+  withingsScopes: [String],
+  withingsConnectedAt: Date,
+  withingsLastSync: Date,
+
+  // Withings baseline data for smart alerts (calculated from historical data)
+  withingsBaseline: {
+    weight: { type: Number }, // Average weight
+    weightStdDev: { type: Number }, // Standard deviation for weight
+    systolicBP: { type: Number }, // Average systolic BP
+    systolicBPStdDev: { type: Number },
+    diastolicBP: { type: Number }, // Average diastolic BP
+    diastolicBPStdDev: { type: Number },
+    restingHeartRate: { type: Number }, // Average resting heart rate
+    restingHeartRateStdDev: { type: Number },
+    lastCalculated: { type: Date } // When baseline was last calculated
+  },
+
   createdAt: { type: Date, default: Date.now },
 });
 

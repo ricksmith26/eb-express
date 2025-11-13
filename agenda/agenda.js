@@ -4,6 +4,12 @@ import User from '../models/User.js';
 import { getPreferredSocketId } from '../socketIo/socketIo.js';
 import {io as IO} from '../app.js'
 import moment from 'moment';
+import { WithingsService } from '../services/WithingsService.js';
+import {
+    WITHINGS_CLIENT_ID,
+    WITHINGS_CLIENT_SECRET,
+    WITHINGS_CALLBACK_URL
+} from '../config/vars.js';
 // import { users } from './userStore'; // a list of registered user emails
 
 const mongoConnectionString = process.env.MONGO_DB_URL;
@@ -128,7 +134,101 @@ export const setupAgenda = async (io) => {
 
                 console.log(error, errors, '<<ERRORS<', user.email)
             }
-           
+
+        }
+    });
+
+    /**
+     * Withings Daily Sync Job
+     * Runs every 24 hours to sync health data for all connected users
+     */
+    agenda.define('withings-daily-sync', async (job) => {
+        console.log('🔄 [Agenda] Starting Withings daily sync...');
+
+        try {
+            // Find all users with active Withings connections
+            const users = await User.find({
+                withingsAccessToken: { $exists: true, $ne: null }
+            }).select('+withingsAccessToken +withingsRefreshToken');
+
+            console.log(`📊 [Agenda] Found ${users.length} users with Withings connected`);
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const user of users) {
+                try {
+                    console.log(`🔄 [Agenda] Syncing Withings data for: ${user.email}`);
+
+                    const service = new WithingsService({
+                        clientId: WITHINGS_CLIENT_ID,
+                        clientSecret: WITHINGS_CLIENT_SECRET,
+                        callbackUrl: WITHINGS_CALLBACK_URL,
+                        accessToken: user.withingsAccessToken,
+                        refreshToken: user.withingsRefreshToken,
+                        tokenExpiry: user.withingsTokenExpiry
+                    });
+
+                    // Fetch last 30 days of data
+                    const endDate = new Date();
+                    const startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 30);
+
+                    // Fetch all data types in parallel
+                    const [measurements, activity, sleep] = await Promise.all([
+                        service.getMeasurements([1, 6, 9, 10, 11, 76, 77, 88], startDate, endDate)
+                            .catch(err => {
+                                console.error(`❌ [Agenda] Failed to fetch measurements for ${user.email}:`, err.message);
+                                return { measurements: [] };
+                            }),
+                        service.getActivity(startDate, endDate)
+                            .catch(err => {
+                                console.error(`❌ [Agenda] Failed to fetch activity for ${user.email}:`, err.message);
+                                return [];
+                            }),
+                        service.getSleep(startDate, endDate)
+                            .catch(err => {
+                                console.error(`❌ [Agenda] Failed to fetch sleep for ${user.email}:`, err.message);
+                                return [];
+                            })
+                    ]);
+
+                    // Update last sync time
+                    user.withingsLastSync = new Date();
+
+                    // Update token if it was refreshed
+                    if (service.token !== user.withingsAccessToken) {
+                        user.withingsAccessToken = service.token;
+                        user.withingsRefreshToken = service.refreshToken;
+                        user.withingsTokenExpiry = new Date(service.tokenExpiry);
+                        console.log(`🔄 [Agenda] Token refreshed for ${user.email}`);
+                    }
+
+                    await user.save();
+
+                    console.log(`✅ [Agenda] Synced Withings data for ${user.email}: ${measurements.measurements.length} measurements, ${activity.length} activity days, ${sleep.length} sleep nights`);
+                    successCount++;
+
+                } catch (error) {
+                    errorCount++;
+                    console.error(`❌ [Agenda] Failed to sync Withings data for ${user.email}:`, error.message);
+
+                    // If token is invalid (error 295, 294), clear Withings connection
+                    if (error.message.includes('295') || error.message.includes('294')) {
+                        console.log(`⚠️ [Agenda] Clearing invalid Withings connection for ${user.email}`);
+                        user.withingsAccessToken = undefined;
+                        user.withingsRefreshToken = undefined;
+                        user.withingsTokenExpiry = undefined;
+                        await user.save();
+                    }
+                }
+            }
+
+            console.log(`✅ [Agenda] Withings daily sync completed: ${successCount} successful, ${errorCount} errors`);
+
+        } catch (error) {
+            console.error('❌ [Agenda] Withings daily sync job failed:', error);
+            throw error;
         }
     });
 
@@ -136,6 +236,12 @@ export const setupAgenda = async (io) => {
     // await agenda.schedule('in 5 seconds', 'schedule daily events'); // Safe now
     await agenda.cancel({ name: 'schedule daily events' });
     // await agenda.every('1 hour', 'schedule daily events'); // Safe now
+
+    // Schedule Withings daily sync (every 24 hours at 2 AM)
+    await agenda.cancel({ name: 'withings-daily-sync' }); // Cancel any existing jobs
+    await agenda.every('24 hours', 'withings-daily-sync');
+    console.log("✅ Withings daily sync scheduled (every 24 hours)");
+
     // await agenda.schedule('in 10 seconds', 'test')
     // // await agenda.schedule('in 15 seconds', 'notify user of event', {email:'ricksmith69@gmail.com', event: {summary: 'party time', start: '09:00'}})
     // const now = new Date();

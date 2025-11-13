@@ -16,6 +16,7 @@ import livekitRoutes from './routes/livekit-routes.js';
 import webRTCRoutes from './routes/webrtc-routes.js'
 import imagesRouter from './routes/imagesRoutes.js';
 import {SpotifyRouter} from './routes/spotify-router.js';
+import withingsRoutes from './routes/withings-routes.js';
 import AsteriskRoutes from './routes/asterisk-routes.js';
 import QueueRoutes from './routes/queue-router.js';
 import modeRouter from './routes/mode-routes.js';
@@ -135,6 +136,7 @@ const redirectUri = `${process.env.FRONTEND_URL}/callback`;
 const spotifyRouter = new SpotifyRouter(clientId, clientSecret, redirectUri);
 
 app.use('/spotify', spotifyRouter.getRouter());
+app.use('/withings', withingsRoutes);
 setupAgenda()
 
 function getUserEmail(socketId) {
