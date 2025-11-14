@@ -15,6 +15,7 @@ class AuthController {
     this.logout = this.logout.bind(this);
     this.getMe = this.getMe.bind(this);
     this.refreshToken = this.refreshToken.bind(this);
+    this.appLogin = this.appLogin.bind(this);
   }
 
   /**
@@ -271,6 +272,73 @@ class AuthController {
 
       console.error("🚨 Token refresh error:", error);
       res.status(500).json({ error: "Token refresh failed" });
+    }
+  }
+
+  /**
+   * App login for mobile app (dev/test)
+   * POST /auth/login
+   * Body: { email, name }
+   */
+  async appLogin(req, res) {
+    try {
+      const { email, name } = req.body;
+
+      if (!email || !name) {
+        return res.status(400).json({
+          error: "Email and name are required",
+          code: "MISSING_CREDENTIALS"
+        });
+      }
+
+      // Find or create user
+      let user = await User.findOne({ email });
+
+      if (!user) {
+        // Create new user
+        user = new User({
+          email,
+          name,
+          // No googleId for simple login
+          createdAt: new Date()
+        });
+        await user.save();
+        console.log(`✅ New user created: ${email}`);
+      } else {
+        // Update name if changed
+        if (user.name !== name) {
+          user.name = name;
+          await user.save();
+        }
+        console.log(`✅ Existing user logged in: ${email}`);
+      }
+
+      // Generate tokens
+      const accessToken = this.generateAccessToken(user);
+      const refreshToken = this.generateRefreshToken(user);
+
+      // Store refresh token in database
+      user.jwtRefreshToken = refreshToken;
+      user.jwtRefreshTokenExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      await user.save();
+
+      console.log(`✅ Tokens generated for: ${user.email}`);
+
+      // Return tokens in response body (for mobile app)
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          picture: user.picture
+        },
+        accessToken,
+        refreshToken
+      });
+    } catch (error) {
+      console.error("🚨 Simple login error:", error);
+      res.status(500).json({ error: "Login failed" });
     }
   }
 }

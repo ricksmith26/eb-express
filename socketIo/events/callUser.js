@@ -5,6 +5,7 @@ import { sendCallNotification } from '../../services/pushNotificationService.js'
 
 const callUser = (socket, users, io) => {
     socket.on("callUser", async ({ toEmail, offer, callerName, recipientName }) => {
+        console.log(offer, '<<OFFERcallUser')
         const callerEmail = getUserEmail(socket.id);
 
         // Use priority routing to get preferred socket ID (web first, then mobile)

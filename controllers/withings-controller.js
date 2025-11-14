@@ -31,22 +31,20 @@ class WithingsController {
   async handleOAuthAuthorize(req, res) {
     try {
       const { email } = req.user; // From JWT middleware
-      const { demo } = req.query; // Check if demo mode requested
+      const { demo, mobile } = req.query; // Check if demo mode or mobile app requested
       const useDemoMode = demo === 'true' || demo === '1';
+      const isMobileApp = mobile === 'true' || mobile === '1';
 
-      // Generate secure state token
-      const state = crypto.randomBytes(32).toString('hex');
-
-      // Store state temporarily (in session)
-      // IMPORTANT: In production, use Redis or a proper session store
-      if (!req.session.withingsStates) {
-        req.session.withingsStates = {};
-      }
-      req.session.withingsStates[state] = {
+      // Encode metadata directly in state parameter (base64 JSON)
+      // This avoids session issues with OAuth browser redirects
+      const stateData = {
+        random: crypto.randomBytes(16).toString('hex'), // CSRF protection
         email,
         createdAt: Date.now(),
-        demo: useDemoMode
+        demo: useDemoMode,
+        mobile: isMobileApp
       };
+      const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
 
       const service = new WithingsService({
         clientId: this.clientId,
@@ -56,7 +54,7 @@ class WithingsController {
 
       const authUrl = service.getAuthorizationUrl(state, useDemoMode);
 
-      console.log(`✅ [WithingsController] Authorization URL generated for: ${email}${useDemoMode ? ' (DEMO MODE)' : ''}`);
+      console.log(`✅ [WithingsController] Authorization URL generated for: ${email}${useDemoMode ? ' (DEMO MODE)' : ''}${isMobileApp ? ' (MOBILE APP)' : ''}`);
 
       res.json({
         success: true,
@@ -88,19 +86,26 @@ class WithingsController {
         return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=missing_params`);
       }
 
-      // Verify state (CSRF protection)
-      const storedState = req.session?.withingsStates?.[state];
-      if (!storedState) {
-        console.error('❌ [WithingsController] Invalid or expired state parameter');
+      // Decode state parameter
+      let stateData;
+      try {
+        const stateJson = Buffer.from(state, 'base64').toString('utf-8');
+        stateData = JSON.parse(stateJson);
+      } catch (error) {
+        console.error('❌ [WithingsController] Invalid state parameter (decode failed)');
         return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=invalid_state`);
       }
 
       // Check if state is too old (10 minutes)
-      const stateAge = Date.now() - storedState.createdAt;
+      const stateAge = Date.now() - stateData.createdAt;
       if (stateAge > 10 * 60 * 1000) {
         console.error('❌ [WithingsController] State parameter expired');
-        delete req.session.withingsStates[state];
-        return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=state_expired`);
+        const isMobileApp = stateData.mobile === true;
+        if (isMobileApp) {
+          return res.redirect(`brigid://biometrics?error=state_expired`);
+        } else {
+          return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=state_expired`);
+        }
       }
 
       const service = new WithingsService({
@@ -113,11 +118,11 @@ class WithingsController {
       const tokens = await service.exchangeCodeForToken(code);
 
       // Update user in database
-      const user = await User.findOne({ email: storedState.email })
+      const user = await User.findOne({ email: stateData.email })
         .select('+withingsAccessToken +withingsRefreshToken');
 
       if (!user) {
-        console.error('❌ [WithingsController] User not found:', storedState.email);
+        console.error('❌ [WithingsController] User not found:', stateData.email);
         return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=user_not_found`);
       }
 
@@ -132,14 +137,40 @@ class WithingsController {
 
       console.log('✅ [WithingsController] Withings connected for:', user.email);
 
-      // Clear session state
-      delete req.session.withingsStates[state];
+      // Check if request was from mobile app (from decoded state)
+      const isMobileApp = stateData.mobile === true;
 
-      // Redirect to frontend success page
-      res.redirect(`${process.env.FRONTEND_URL}/biometrics?connected=true`);
+      if (isMobileApp) {
+        // Redirect to HTML page that will trigger deep link
+        console.log('📱 [WithingsController] Redirecting to mobile app via HTML redirect page');
+        res.redirect(`/oauth-success.html?connected=true`);
+      } else {
+        // Redirect to web frontend
+        console.log('🌐 [WithingsController] Redirecting to web frontend');
+        res.redirect(`${process.env.FRONTEND_URL}/biometrics?connected=true`);
+      }
     } catch (error) {
       console.error('❌ [WithingsController] OAuth callback failed:', error);
-      res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=connection_failed`);
+
+      // Try to decode state to check if mobile app
+      let isMobileApp = false;
+      try {
+        const { state } = req.query;
+        if (state) {
+          const stateJson = Buffer.from(state, 'base64').toString('utf-8');
+          const stateData = JSON.parse(stateJson);
+          isMobileApp = stateData.mobile === true;
+        }
+      } catch (decodeError) {
+        // If we can't decode state, assume web frontend
+        console.error('❌ [WithingsController] Could not decode state in error handler');
+      }
+
+      if (isMobileApp) {
+        res.redirect(`/oauth-success.html?error=connection_failed`);
+      } else {
+        res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=connection_failed`);
+      }
     }
   }
 

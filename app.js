@@ -77,6 +77,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from public directory (for OAuth success page, etc.)
+app.use(express.static('public'));
+
 app.use((req, res, next) => {
   // console.error("📝 PRE Session Middleware Debug: ", req.session);
   next();

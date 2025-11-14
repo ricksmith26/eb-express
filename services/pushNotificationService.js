@@ -70,6 +70,8 @@ export async function sendCallNotification(pushTokens, callData) {
         android: {
           priority: 'high',
           notification: {
+            icon: 'notification_icon',
+            color: '#2196F3',
             channelId: 'calls',
             sound: 'default',
             priority: 'max',
@@ -143,6 +145,8 @@ export async function sendMessageNotification(pushTokens, messageData) {
         android: {
           priority: 'high',
           notification: {
+            icon: 'notification_icon',
+            color: '#2196F3',
             channelId: 'messages',
             priority: 'high',
             defaultSound: true,

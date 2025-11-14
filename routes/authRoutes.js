@@ -14,6 +14,9 @@ class AuthRoutes {
   }
 
   initializeRoutes() {
+    // App login (for mobile app dev/test)
+    this.router.post("/login", this.controller.appLogin);
+
     // OAuth routes
     this.router.get("/google", this.controller.googleLogin);
     this.router.get("/google/callback", this.controller.googleCallback);
