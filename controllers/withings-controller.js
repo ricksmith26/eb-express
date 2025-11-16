@@ -526,7 +526,8 @@ class WithingsController {
     try {
       const { email } = req.user;
 
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ email })
+        .select('+withingsAccessToken');
 
       const isConnected = !!user.withingsAccessToken;
 
