@@ -127,6 +127,14 @@ class WithingsController {
         return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=user_not_found`);
       }
 
+      console.log('💾 [WithingsController] Saving Withings tokens for:', user.email, {
+        hasAccessToken: !!tokens.accessToken,
+        hasRefreshToken: !!tokens.refreshToken,
+        userId: tokens.userId,
+        scopes: tokens.scopes,
+        expiresIn: tokens.expiresIn
+      });
+
       user.withingsAccessToken = tokens.accessToken;
       user.withingsRefreshToken = tokens.refreshToken;
       user.withingsTokenExpiry = new Date(Date.now() + (tokens.expiresIn * 1000));
@@ -134,7 +142,15 @@ class WithingsController {
       user.withingsScopes = tokens.scopes;
       user.withingsConnectedAt = new Date();
       user.withingsLastSync = null; // Will be set on first sync
+
+      console.log('💾 [WithingsController] About to save user document...');
       await user.save();
+      console.log('✅ [WithingsController] User document saved successfully!');
+
+      // Verify the save by re-querying
+      const verifyUser = await User.findOne({ email: user.email })
+        .select('+withingsAccessToken');
+      console.log('🔍 [WithingsController] Verification - User has access token:', !!verifyUser.withingsAccessToken);
 
       console.log('✅ [WithingsController] Withings connected for:', user.email);
 
@@ -267,7 +283,7 @@ class WithingsController {
 
       console.log(`📊 [WithingsController] Measurements retrieved for ${email}:`, {
         count: result.measurements.length,
-        dateRange: startDate && endDate ? `${startDate.toISOString()} to ${endDate.toISOString()}` : 'all time',
+        dateRange: startDate && endDate ? `${startDate} to ${endDate}` : 'all time',
         measureTypes,
         sampleDates: result.measurements.slice(0, 3).map(m => new Date(m.date * 1000).toISOString())
       });
@@ -662,10 +678,26 @@ class WithingsController {
     try {
       const { email } = req.user;
 
+      console.log(`🔍 [WithingsController] Checking connection status for: ${email}`);
+
       const user = await User.findOne({ email })
         .select('+withingsAccessToken');
 
       const isConnected = !!user.withingsAccessToken;
+
+      console.log(`📊 [WithingsController] Status check result for ${email}:`, {
+        isConnected,
+        hasAccessToken: !!user.withingsAccessToken,
+        userId: user.withingsUserId,
+        connectedAt: user.withingsConnectedAt,
+        lastSync: user.withingsLastSync,
+        scopes: user.withingsScopes
+      });
+
+      // Disable caching to ensure fresh status checks
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
 
       res.json({
         success: true,
