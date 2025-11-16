@@ -20,6 +20,7 @@ class WithingsController {
     this.getSleep = this.getSleep.bind(this);
     this.syncAllData = this.syncAllData.bind(this);
     this.disconnect = this.disconnect.bind(this);
+    this.getLastAvailableData = this.getLastAvailableData.bind(this);
     this.getConnectionStatus = this.getConnectionStatus.bind(this);
   }
 
@@ -511,6 +512,111 @@ class WithingsController {
       });
     } catch (error) {
       console.error('❌ [WithingsController] Disconnect failed:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * GET /withings/data/last-available
+   * Find the most recent available data by searching backwards in time
+   */
+  async getLastAvailableData(req, res) {
+    try {
+      const { email } = req.user;
+
+      const user = await User.findOne({ email })
+        .select('+withingsAccessToken +withingsRefreshToken');
+
+      if (!user.withingsAccessToken) {
+        return res.status(404).json({
+          success: false,
+          error: 'Withings not connected',
+          code: 'NOT_CONNECTED'
+        });
+      }
+
+      const service = new WithingsService({
+        clientId: this.clientId,
+        clientSecret: this.clientSecret,
+        callbackUrl: this.callbackUrl,
+        accessToken: user.withingsAccessToken,
+        refreshToken: user.withingsRefreshToken,
+        tokenExpiry: user.withingsTokenExpiry
+      });
+
+      // Search backwards in 30-day chunks up to 1 year
+      const endDate = new Date();
+      let lastMeasurement = null;
+      let lastActivity = null;
+      let lastSleep = null;
+
+      // Check progressively: 30 days, 90 days, 180 days, 365 days
+      const searchPeriods = [30, 90, 180, 365];
+
+      for (const days of searchPeriods) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        console.log(`🔍 [WithingsController] Checking last ${days} days for data...`);
+
+        const [measurements, activity, sleep] = await Promise.all([
+          service.getMeasurements([1, 6, 9, 10, 11, 76, 77, 88], startDate, endDate),
+          service.getActivity(startDate, endDate),
+          service.getSleep(startDate, endDate)
+        ]);
+
+        // Find most recent data in each category
+        if (!lastMeasurement && measurements.measurements.length > 0) {
+          const sorted = measurements.measurements.sort((a, b) => b.date - a.date);
+          lastMeasurement = {
+            date: new Date(sorted[0].date * 1000),
+            daysAgo: days
+          };
+        }
+
+        if (!lastActivity && activity.length > 0) {
+          const sorted = activity.sort((a, b) => new Date(b.date) - new Date(a.date));
+          lastActivity = {
+            date: new Date(sorted[0].date),
+            daysAgo: days
+          };
+        }
+
+        if (!lastSleep && sleep.length > 0) {
+          const sorted = sleep.sort((a, b) => new Date(b.enddate) - new Date(a.enddate));
+          lastSleep = {
+            date: new Date(sorted[0].enddate * 1000),
+            daysAgo: days
+          };
+        }
+
+        // If we found data in all categories, stop searching
+        if (lastMeasurement && lastActivity && lastSleep) {
+          break;
+        }
+      }
+
+      // Update token if it was refreshed
+      if (service.token !== user.withingsAccessToken) {
+        user.withingsAccessToken = service.token;
+        user.withingsRefreshToken = service.refreshToken;
+        user.withingsTokenExpiry = new Date(service.tokenExpiry);
+        await user.save();
+      }
+
+      console.log('✅ [WithingsController] Last available data search completed');
+
+      res.json({
+        success: true,
+        lastMeasurement,
+        lastActivity,
+        lastSleep
+      });
+    } catch (error) {
+      console.error('❌ [WithingsController] Last available data search failed:', error);
       res.status(500).json({
         success: false,
         error: error.message

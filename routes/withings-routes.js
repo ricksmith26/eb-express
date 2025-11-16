@@ -73,6 +73,13 @@ class WithingsRoutes {
       this.controller.getSleep
     );
 
+    // GET /withings/data/last-available - Find last available data
+    this.router.get(
+      '/data/last-available',
+      verifyAccessToken,
+      this.controller.getLastAvailableData
+    );
+
     // Sync & disconnect
     // POST /withings/sync - Manually trigger data sync
     this.router.post(
