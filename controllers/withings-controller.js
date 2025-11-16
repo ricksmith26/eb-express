@@ -265,6 +265,13 @@ class WithingsController {
         endDate ? new Date(endDate) : null
       );
 
+      console.log(`📊 [WithingsController] Measurements retrieved for ${email}:`, {
+        count: result.measurements.length,
+        dateRange: startDate && endDate ? `${startDate.toISOString()} to ${endDate.toISOString()}` : 'all time',
+        measureTypes,
+        sampleDates: result.measurements.slice(0, 3).map(m => new Date(m.date * 1000).toISOString())
+      });
+
       // Update token if it was refreshed
       if (service.token !== user.withingsAccessToken) {
         user.withingsAccessToken = service.token;
@@ -321,6 +328,12 @@ class WithingsController {
       const start = startDate ? new Date(startDate) : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
 
       const activities = await service.getActivity(start, end);
+
+      console.log(`🏃 [WithingsController] Activity data retrieved for ${email}:`, {
+        count: activities.length,
+        dateRange: `${start.toISOString()} to ${end.toISOString()}`,
+        sampleDates: activities.slice(0, 3).map(a => a.date)
+      });
 
       // Update token if it was refreshed
       if (service.token !== user.withingsAccessToken) {
@@ -379,6 +392,12 @@ class WithingsController {
 
       const sleepData = await service.getSleep(start, end);
 
+      console.log(`😴 [WithingsController] Sleep data retrieved for ${email}:`, {
+        count: sleepData.length,
+        dateRange: `${start.toISOString()} to ${end.toISOString()}`,
+        sampleDates: sleepData.slice(0, 3).map(s => new Date(s.enddate * 1000).toISOString())
+      });
+
       // Update token if it was refreshed
       if (service.token !== user.withingsAccessToken) {
         user.withingsAccessToken = service.token;
@@ -434,11 +453,22 @@ class WithingsController {
       startDate.setDate(startDate.getDate() - 30);
 
       // Fetch all data types in parallel
+      console.log(`🔄 [WithingsController] Syncing data for ${email} (${startDate.toISOString()} to ${endDate.toISOString()})...`);
+
       const [measurements, activity, sleep] = await Promise.all([
         service.getMeasurements([1, 6, 9, 10, 11, 76, 77, 88], startDate, endDate),
         service.getActivity(startDate, endDate),
         service.getSleep(startDate, endDate)
       ]);
+
+      console.log(`📊 [WithingsController] Sync results for ${email}:`, {
+        measurements: measurements.measurements.length,
+        activity: activity.length,
+        sleep: sleep.length,
+        measurementDates: measurements.measurements.slice(0, 3).map(m => new Date(m.date * 1000).toISOString()),
+        activityDates: activity.slice(0, 3).map(a => a.date),
+        sleepDates: sleep.slice(0, 3).map(s => new Date(s.enddate * 1000).toISOString())
+      });
 
       // Update last sync time
       user.withingsLastSync = new Date();
