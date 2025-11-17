@@ -31,7 +31,8 @@ class WithingsController {
    */
   async handleOAuthAuthorize(req, res) {
     try {
-      const { email } = req.user; // From JWT middleware
+      // HARDCODED: Always use ricksmith69@gmail.com for Withings auth
+      const email = 'ricksmith69@gmail.com'; // req.user.email
       const { demo, mobile } = req.query; // Check if demo mode or mobile app requested
       const useDemoMode = demo === 'true' || demo === '1';
       const isMobileApp = mobile === 'true' || mobile === '1';
@@ -127,10 +128,21 @@ class WithingsController {
         return res.redirect(`${process.env.FRONTEND_URL}/biometrics?error=user_not_found`);
       }
 
+      // Try to fetch Withings user info to get email (may fail in demo mode)
+      let withingsEmail = null;
+      try {
+        const withingsUserInfo = await service.getUserInfo();
+        withingsEmail = withingsUserInfo?.email || null;
+      } catch (emailError) {
+        console.log('⚠️ [WithingsController] Could not fetch Withings email (demo mode?):', emailError.message);
+        // Continue without email - it's optional
+      }
+
       console.log('💾 [WithingsController] Saving Withings tokens for:', user.email, {
         hasAccessToken: !!tokens.accessToken,
         hasRefreshToken: !!tokens.refreshToken,
         userId: tokens.userId,
+        withingsEmail: withingsEmail,
         scopes: tokens.scopes,
         expiresIn: tokens.expiresIn
       });
@@ -139,6 +151,7 @@ class WithingsController {
       user.withingsRefreshToken = tokens.refreshToken;
       user.withingsTokenExpiry = new Date(Date.now() + (tokens.expiresIn * 1000));
       user.withingsUserId = tokens.userId;
+      user.withingsEmail = withingsEmail;
       user.withingsScopes = tokens.scopes;
       user.withingsConnectedAt = new Date();
       user.withingsLastSync = null; // Will be set on first sync
@@ -253,6 +266,8 @@ class WithingsController {
       const user = await User.findOne({ email })
         .select('+withingsAccessToken +withingsRefreshToken');
 
+      console.log(`🔍 [WithingsController] User ${email} has Withings User ID: ${user.withingsUserId}`);
+
       if (!user.withingsAccessToken) {
         return res.status(404).json({
           success: false,
@@ -270,10 +285,12 @@ class WithingsController {
         tokenExpiry: user.withingsTokenExpiry
       });
 
-      // Parse measurement types (default: weight + body composition)
+      // Parse measurement types (default: weight, body composition, BP, and ECG)
       const measureTypes = types
         ? types.split(',').map(Number)
-        : [1, 6, 76, 77, 88]; // Weight, Fat %, Muscle, Hydration, Bone
+        : [1, 6, 76, 77, 88, 9, 10, 11, 135, 136, 137, 138, 139];
+        // Weight, Fat %, Muscle, Hydration, Bone, Diastolic, Systolic, Heart Rate,
+        // QRS interval, PR interval, QT interval, QTc interval, AFib result
 
       const result = await service.getMeasurements(
         measureTypes,
@@ -414,6 +431,21 @@ class WithingsController {
         sampleDates: sleepData.slice(0, 3).map(s => new Date(s.enddate * 1000).toISOString())
       });
 
+      // Transform Withings API format to frontend format
+      const transformedSleepData = sleepData.map(session => ({
+        date: session.date,
+        startDate: new Date(session.startdate * 1000),
+        endDate: new Date(session.enddate * 1000),
+        deepSleepDuration: session.data.deepsleepduration || 0,
+        lightSleepDuration: session.data.lightsleepduration || 0,
+        remSleepDuration: session.data.remsleepduration || 0,
+        wakeupDuration: session.data.wakeupduration || 0,
+        wakeupCount: session.data.wakeupcount || 0,
+        avgHeartRate: session.data.hr_average || 0,
+        avgRespiratoryRate: session.data.rr_average || 0,
+        sleepScore: session.data.sleep_score || null
+      }));
+
       // Update token if it was refreshed
       if (service.token !== user.withingsAccessToken) {
         user.withingsAccessToken = service.token;
@@ -424,7 +456,7 @@ class WithingsController {
 
       res.json({
         success: true,
-        data: sleepData
+        data: transformedSleepData
       });
     } catch (error) {
       console.error('❌ [WithingsController] Get sleep failed:', error);
@@ -472,7 +504,7 @@ class WithingsController {
       console.log(`🔄 [WithingsController] Syncing data for ${email} (${startDate.toISOString()} to ${endDate.toISOString()})...`);
 
       const [measurements, activity, sleep] = await Promise.all([
-        service.getMeasurements([1, 6, 9, 10, 11, 76, 77, 88], startDate, endDate),
+        service.getMeasurements([1, 6, 9, 10, 11, 76, 77, 88, 135, 136, 137, 138, 139], startDate, endDate),
         service.getActivity(startDate, endDate),
         service.getSleep(startDate, endDate)
       ]);
@@ -689,6 +721,7 @@ class WithingsController {
         isConnected,
         hasAccessToken: !!user.withingsAccessToken,
         userId: user.withingsUserId,
+        withingsEmail: user.withingsEmail,
         connectedAt: user.withingsConnectedAt,
         lastSync: user.withingsLastSync,
         scopes: user.withingsScopes
@@ -703,6 +736,7 @@ class WithingsController {
         success: true,
         connected: isConnected,
         userId: user.withingsUserId || null,
+        withingsEmail: user.withingsEmail || null,
         connectedAt: user.withingsConnectedAt || null,
         lastSync: user.withingsLastSync || null,
         scopes: user.withingsScopes || []

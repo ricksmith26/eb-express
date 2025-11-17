@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
   },
   withingsTokenExpiry: Date,
   withingsUserId: String,
+  withingsEmail: String, // Withings account email
   withingsScopes: [String],
   withingsConnectedAt: Date,
   withingsLastSync: Date,

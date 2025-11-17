@@ -169,6 +169,14 @@ export class WithingsService {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log('🔍 [WithingsService] Measurements API response:', {
+        status: response.data.status,
+        measuregrps: response.data.body?.measuregrps?.length || 0,
+        more: response.data.body?.more,
+        offset: response.data.body?.offset,
+        timezone: response.data.body?.timezone
+      });
+
       if (response.data.status !== 0) {
         // Handle specific error codes
         if (response.data.status === 295) {
@@ -299,6 +307,14 @@ export class WithingsService {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log('🔍 [WithingsService] Sleep API response:', {
+        status: response.data.status,
+        seriesCount: response.data.body?.series?.length || 0,
+        more: response.data.body?.more,
+        offset: response.data.body?.offset,
+        fullBody: JSON.stringify(response.data.body)
+      });
+
       if (response.data.status !== 0) {
         if (response.data.status === 295) {
           console.log('🔄 [WithingsService] Token expired (295), refreshing and retrying...');
@@ -347,6 +363,44 @@ export class WithingsService {
     }
   }
 
+  /**
+   * Get user profile information (email, etc.)
+   * @returns {Promise<Object>} User profile
+   */
+  async getUserInfo() {
+    try {
+      const token = await this.getAccessToken();
+      const params = {
+        action: 'list'
+      };
+
+      const response = await axios.post(`${this.baseUrl}/v2/user`, null, {
+        params,
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('🔍 [WithingsService] User info API response:', {
+        status: response.data.status,
+        body: response.data.body
+      });
+
+      if (response.data.status !== 0) {
+        if (response.data.status === 295) {
+          console.log('🔄 [WithingsService] Token expired (295), refreshing and retrying...');
+          await this.refreshAccessToken();
+          return this.getUserInfo();
+        }
+        throw new Error(`Withings API error: ${response.data.status}`);
+      }
+
+      const users = response.data.body.users || [];
+      return users.length > 0 ? users[0] : null;
+    } catch (error) {
+      console.error('❌ [WithingsService] Failed to get user info:', error.message);
+      throw error;
+    }
+  }
+
   // Private helper methods
 
   /**
@@ -379,7 +433,12 @@ export class WithingsService {
       77: 'kg',     // Hydration
       88: 'kg',     // Bone Mass
       91: 'm/s',    // Pulse Wave Velocity
-      123: 'ml/min/kg' // VO2 Max
+      123: 'ml/min/kg', // VO2 Max
+      135: 'ms',    // QRS interval duration (ECG)
+      136: 'ms',    // PR interval duration (ECG)
+      137: 'ms',    // QT interval duration (ECG)
+      138: 'ms',    // Corrected QT interval (ECG)
+      139: ''       // Atrial fibrillation result from PPG (no unit)
     };
     return units[type] || '';
   }
