@@ -55,25 +55,41 @@ class LivekitController {
 
   async createParticipantToken(userInfo, roomName) {
     try {
-      const email = userInfo.email;
+      const identifier = userInfo.email;
 
-      if (!email) {
-        throw new Error("Email is required to fetch user data");
-      }
+      // Check if identifier looks like an email or a device_id
+      const isEmail = identifier && identifier.includes("@");
 
-      const user = await User.findOne({ email });
+      let tokenMetadata;
+      let identity;
 
-      if (!user) {
-        throw new Error("User not found in database");
-      }
+      if (isEmail) {
+        // Existing flow: look up user by email
+        const user = await User.findOne({ email: identifier });
 
-      const at = new AccessToken(API_KEY, API_SECRET, {
-        identity: user.googleId,
-        metadata: JSON.stringify({
+        if (!user) {
+          throw new Error("User not found in database");
+        }
+
+        identity = user.googleId;
+        tokenMetadata = {
           email: user.email,
           name: user.name,
           initialPrompt: userInfo.message,
-        }),
+        };
+      } else {
+        // Onboarding flow: use device_id as identity (no user yet)
+        identity = identifier || `device_${Math.floor(Math.random() * 10_000)}`;
+        tokenMetadata = {
+          deviceId: identifier,
+          isOnboarding: true,
+          initialPrompt: userInfo.message,
+        };
+      }
+
+      const at = new AccessToken(API_KEY, API_SECRET, {
+        identity,
+        metadata: JSON.stringify(tokenMetadata),
       });
 
       at.addGrant({
