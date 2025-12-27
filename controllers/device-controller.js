@@ -5,6 +5,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import FhirDevice from '../models/FhirDevice.js';
+import caService from '../services/ca-service.js';
 
 const { JWT_SECRET, DEVICE_JWT_SECRET } = process.env;
 
@@ -117,17 +118,48 @@ class DeviceController {
         await device.save();
       }
 
-      // For now, we'll simulate certificate signing
-      // In production, this would use a real CA
-      const certExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
-      const certFingerprint = crypto
-        .createHash('sha256')
-        .update(fingerprint + Date.now())
-        .digest('hex');
+      // Sign device certificate using CA service
+      let certResult = null;
+      let certificate = null;
+      let certFingerprint = null;
+      let certExpiry = null;
 
-      // Store certificate info (mock cert for now)
-      device.certificateExpiry = certExpiry;
-      device.certificateFingerprint = certFingerprint;
+      if (csr) {
+        // Sign the CSR with our CA
+        certResult = caService.signCSR(csr, {
+          deviceId: device_id,
+          validityDays: 365
+        });
+
+        if (certResult) {
+          certificate = certResult.certificate;
+          certFingerprint = certResult.fingerprint;
+          certExpiry = certResult.expiresAt;
+
+          // Store certificate info
+          device.certificate = certificate;
+          device.certificateExpiry = certExpiry;
+          device.certificateFingerprint = certFingerprint;
+
+          if (certResult.selfSigned) {
+            console.warn(`⚠️ Device ${device_id} using self-signed certificate (CA not configured)`);
+          }
+        }
+      }
+
+      // Fallback: generate fingerprint-based identifier if no CSR provided
+      if (!certFingerprint) {
+        certExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+        certFingerprint = crypto
+          .createHash('sha256')
+          .update(fingerprint + Date.now())
+          .digest('hex');
+
+        device.certificateExpiry = certExpiry;
+        device.certificateFingerprint = certFingerprint;
+        console.warn(`⚠️ Device ${device_id} registered without CSR - no certificate issued`);
+      }
+
       await device.save();
 
       // Generate tokens
@@ -140,17 +172,25 @@ class DeviceController {
 
       console.log(`✅ Device ${device_id} registered successfully`);
 
-      res.json({
+      // Build response
+      const response = {
         success: true,
         device_id: device.getDeviceId(),
         resource_id: device.id,
-        certificate: `-----BEGIN CERTIFICATE-----\nMOCK_CERTIFICATE_FOR_${device_id}\n-----END CERTIFICATE-----`,
         certificate_fingerprint: certFingerprint,
         expires_at: certExpiry.toISOString(),
         token: accessToken,
         refresh_token: refreshToken,
         token_expires_at: accessExpiry.toISOString()
-      });
+      };
+
+      // Include certificate if one was generated
+      if (certificate) {
+        response.certificate = certificate;
+        response.ca_configured = caService.isConfigured();
+      }
+
+      res.json(response);
 
     } catch (error) {
       console.error('🚨 Device registration error:', error);
