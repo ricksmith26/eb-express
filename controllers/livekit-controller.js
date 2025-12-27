@@ -24,8 +24,8 @@ class LivekitController {
         return res.status(500).json({ error: "Missing LiveKit environment variables" });
       }
 
-      const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
-      const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
+      const participantIdentity = `voice_assistant_user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const roomName = `voice_assistant_room_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const { email, message } = req.params;
 
       const participantToken = await this.createParticipantToken(
@@ -63,7 +63,7 @@ class LivekitController {
       let tokenMetadata;
       let identity;
 
-      if (isEmail) {
+      if (false) {
         // Existing flow: look up user by email
         const user = await User.findOne({ email: identifier });
 

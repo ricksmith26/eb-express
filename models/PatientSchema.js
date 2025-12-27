@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 const patientSchema = new mongoose.Schema({
   resourceType: { type: String, default: "Patient" },
-  id: { type: String, required: true, unique: true },
+  id: { type: String, unique: true, default: () => uuidv4() },
   name: [
     {
       use: { type: String, enum: ["usual", "official", "temp", "nickname", "anonymous", "old", "maiden"] },
