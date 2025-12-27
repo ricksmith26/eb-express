@@ -21,6 +21,7 @@ import AsteriskRoutes from './routes/asterisk-routes.js';
 import QueueRoutes from './routes/queue-router.js';
 import modeRouter from './routes/mode-routes.js';
 import callHistoryRoutes from './routes/call-history-routes.js';
+import deviceRoutes from './routes/deviceRoutes.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
 import MongoStore from "connect-mongo";
@@ -140,6 +141,7 @@ const spotifyRouter = new SpotifyRouter(clientId, clientSecret, redirectUri);
 
 app.use('/spotify', spotifyRouter.getRouter());
 app.use('/withings', withingsRoutes);
+app.use('/device', deviceRoutes);
 setupAgenda()
 
 function getUserEmail(socketId) {

@@ -15,6 +15,7 @@ import rejectCall from './events/rejectCall.js'
 import registerPushToken from './events/registerPushToken.js'
 import declineCall from './events/declineCall.js'
 import cancelCall from './events/cancelCall.js'
+import registerDevice from './events/registerDevice.js'
 
 // Change from Map<email, socketId> to Map<email, Array<{socketId, deviceType}>>
 export const users = new Map();
@@ -176,5 +177,8 @@ export const socketInit = (io) => {
       // agentStatusChange(socket, Agents, agent, stat)
 
       registerAgent(socket, Agents)
+
+      // Device registration (IoT devices like Brigid Pi)
+      registerDevice(io, socket)
     });
 }
