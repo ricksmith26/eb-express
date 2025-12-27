@@ -41,4 +41,6 @@ terraform/initial-app/
 terraform/initial-app.zip
 
 # CA certificates (private keys)
-certs/*.key
+# Note: CA key is committed for EB deployment (dev CA only)
+# For production, use AWS Secrets Manager
+# certs/*.key
