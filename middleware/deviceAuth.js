@@ -4,6 +4,7 @@
  */
 import jwt from 'jsonwebtoken';
 import FhirDevice from '../models/FhirDevice.js';
+import caService from '../services/ca-service.js';
 
 const { JWT_SECRET, DEVICE_JWT_SECRET } = process.env;
 
@@ -240,9 +241,112 @@ export const optionalDeviceAuth = async (req, res, next) => {
   next();
 };
 
+/**
+ * Verify device certificate (application-layer mTLS)
+ * Used for sensitive operations requiring certificate proof
+ */
+export const verifyCertificate = async (req, res, next) => {
+  try {
+    // Certificate can come from nginx header (X-Client-Cert) or request body
+    const certPem = req.headers['x-client-cert'] || req.body?.certificate;
+
+    if (!certPem) {
+      return res.status(401).json({
+        error: 'Client certificate required',
+        code: 'CERTIFICATE_REQUIRED'
+      });
+    }
+
+    // Verify certificate was signed by our CA
+    const verification = caService.verifyCertificate(certPem);
+
+    if (!verification.valid) {
+      return res.status(401).json({
+        error: verification.error || 'Certificate verification failed',
+        code: 'CERTIFICATE_INVALID'
+      });
+    }
+
+    // Extract device ID from certificate CN (format: "Device: DEVICEID")
+    const cnMatch = verification.subject?.match(/Device:\s*([A-F0-9]+)/i);
+    const certDeviceId = cnMatch ? cnMatch[1] : null;
+
+    // Find device by certificate fingerprint
+    const device = await FhirDevice.findByCertFingerprint(verification.fingerprint);
+
+    if (!device) {
+      return res.status(401).json({
+        error: 'Device not found for certificate',
+        code: 'DEVICE_NOT_FOUND'
+      });
+    }
+
+    // Verify device ID matches if present in both
+    if (certDeviceId && device.getDeviceId() !== certDeviceId) {
+      return res.status(401).json({
+        error: 'Certificate device ID mismatch',
+        code: 'DEVICE_ID_MISMATCH'
+      });
+    }
+
+    // Attach device and cert info to request
+    req.device = device;
+    req.certificate = {
+      fingerprint: verification.fingerprint,
+      subject: verification.subject,
+      expiresAt: verification.expiresAt
+    };
+
+    next();
+  } catch (error) {
+    console.error('🚨 Certificate verification error:', error);
+    res.status(500).json({
+      error: 'Certificate verification failed',
+      code: 'CERT_VERIFICATION_ERROR'
+    });
+  }
+};
+
+/**
+ * Combined JWT + Certificate verification (strongest auth)
+ * Requires both valid JWT token AND matching certificate
+ */
+export const verifyDeviceWithCert = async (req, res, next) => {
+  // First verify JWT token
+  await verifyDeviceToken(req, res, async () => {
+    // Then verify certificate if CA is configured
+    if (caService.isConfigured()) {
+      const certPem = req.headers['x-client-cert'] || req.body?.certificate;
+
+      if (certPem) {
+        const verification = caService.verifyCertificate(certPem);
+
+        if (verification.valid) {
+          // Verify cert fingerprint matches device record
+          if (req.device.certificateFingerprint !== verification.fingerprint) {
+            return res.status(401).json({
+              error: 'Certificate does not match device',
+              code: 'CERTIFICATE_MISMATCH'
+            });
+          }
+
+          req.certificate = {
+            fingerprint: verification.fingerprint,
+            verified: true
+          };
+        }
+      }
+    }
+
+    next();
+  });
+};
+
 export default {
   verifyDeviceToken,
   verifyDeviceRefreshToken,
   verifyDeviceFingerprint,
-  optionalDeviceAuth
+  optionalDeviceAuth,
+  verifyCertificate,
+  verifyDeviceWithCert
 };
