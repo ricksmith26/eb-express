@@ -9,6 +9,7 @@ class LivekitRoutes {
   }
 
   initializeRoutes() {
+    // isOnboarding can be passed as query param: /connect/email?isOnboarding=true
     this.router.get("/connect/:email/:message?", this.livekitController.getConnectionDetails);
   }
 

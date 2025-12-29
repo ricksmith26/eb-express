@@ -2,6 +2,7 @@ import { AccessToken } from "livekit-server-sdk";
 import dotenv from "dotenv";
 import Participant from "../models/Participant.js";
 import User from "../models/User.js";
+import Patient from "../models/PatientSchema.js";
 import { dotEnvConfig } from "../config/vars.js";
 
 dotenv.config(dotEnvConfig);
@@ -24,13 +25,15 @@ class LivekitController {
         return res.status(500).json({ error: "Missing LiveKit environment variables" });
       }
 
-      const participantIdentity = `voice_assistant_user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const roomName = `voice_assistant_room_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
+      const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
       const { email, message } = req.params;
+      const isOnboarding = req.query.isOnboarding === 'true';
 
       const participantToken = await this.createParticipantToken(
         { identity: participantIdentity, email, message },
-        roomName
+        roomName,
+        { isOnboarding }
       );
 
       const newParticipant = new Participant({
@@ -53,7 +56,7 @@ class LivekitController {
     }
   }
 
-  async createParticipantToken(userInfo, roomName) {
+  async createParticipantToken(userInfo, roomName, { isOnboarding = false } = {}) {
     try {
       const identifier = userInfo.email;
 
@@ -63,26 +66,46 @@ class LivekitController {
       let tokenMetadata;
       let identity;
 
-      if (false) {
+      if (isEmail) {
         // Existing flow: look up user by email
         const user = await User.findOne({ email: identifier });
 
-        if (!user) {
-          throw new Error("User not found in database");
-        }
+        if (user) {
+          identity = user.googleId;
+          tokenMetadata = {
+            email: user.email,
+            name: user.name,
+            initialPrompt: userInfo.message,
+            isOnboarding,
+          };
+        } else {
+          // Fallback: look up patient by email in telecom array
+          const patient = await Patient.findOne({
+            "telecom.system": "email",
+            "telecom.value": identifier,
+          });
 
-        identity = user.googleId;
-        tokenMetadata = {
-          email: user.email,
-          name: user.name,
-          initialPrompt: userInfo.message,
-        };
+          if (!patient) {
+            throw new Error("User or Patient not found in database");
+          }
+
+          identity = patient.id;
+          const patientName = patient.name?.[0]?.given?.[0] || 'Kevin'
+
+          tokenMetadata = {
+            email: identifier,
+            name: patientName,
+            patientId: patient.id,
+            isOnboarding,
+            initialPrompt: userInfo.message,
+          };
+        }
       } else {
         // Onboarding flow: use device_id as identity (no user yet)
         identity = identifier || `device_${Math.floor(Math.random() * 10_000)}`;
         tokenMetadata = {
           deviceId: identifier,
-          isOnboarding: true,
+          isOnboarding,
           initialPrompt: userInfo.message,
         };
       }
