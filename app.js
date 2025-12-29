@@ -63,7 +63,7 @@ app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse p
 
 // CORS configuration - restrict to frontend URL for security
 const corsOptions = {
-  origin: [process.env.FRONTEND_URL, "http://localhost:5173", "https://main.d1027o4nsqa17p.amplifyapp.com/"], // Use FRONTEND_URL if set, otherwise allow all (dev only)
+  origin: [process.env.FRONTEND_URL, "http://localhost:5173", "https://main.d1027o4nsqa17p.amplifyapp.com"], // Use FRONTEND_URL if set, otherwise allow all (dev only)
   credentials: true, // Allow cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
