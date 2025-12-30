@@ -24,10 +24,10 @@ class PatientMediaRoutes {
       patientMediaController.confirmUpload
     );
 
-    // Get all media for a patient
-    // GET /api/patient-media/patient/:patientId?type=photo|video&status=confirmed
+    // Get all media for a patient by email
+    // GET /api/patient-media/patient/:email?type=photo|video&status=confirmed
     this.router.get(
-      "/patient/:patientId",
+      "/patient/:email",
       patientMediaController.getPatientMedia
     );
 
