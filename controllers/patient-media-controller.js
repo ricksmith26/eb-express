@@ -1,6 +1,5 @@
 import s3MediaService from "../services/s3-media-service.js";
 import PatientMedia from "../models/PatientMedia.js";
-import Patient from "../models/PatientSchema.js";
 
 const LOG_PREFIX = "[PatientMediaController]";
 
@@ -124,30 +123,18 @@ class PatientMediaController {
       const { email } = req.params;
       const { type, status = "confirmed" } = req.query;
 
-      // Look up patient by email in telecom array
-      const patient = await Patient.findOne({
-        "telecom.system": "email",
-        "telecom.value": email,
-      });
-
-      if (!patient) {
-        console.error(`${LOG_PREFIX} [getPatientMedia] ERROR - Patient not found for email: ${email}`);
-        return res.status(404).json({ error: "Patient not found" });
-      }
-
-      const patientId = patient.id;
-      const query = { patientId, status };
+      // Query using email as patientId (frontend stores media with email as identifier)
+      const query = { patientId: email, status };
       if (type) query.type = type;
 
       const mediaRecords = await PatientMedia.find(query)
         .sort({ uploadedAt: -1 })
         .lean();
 
-      console.log(`${LOG_PREFIX} [getPatientMedia] SUCCESS - email: ${email}, patientId: ${patientId}, count: ${mediaRecords.length}`);
+      console.log(`${LOG_PREFIX} [getPatientMedia] SUCCESS - email: ${email}, count: ${mediaRecords.length}`);
 
       return res.json({
         email,
-        patientId,
         count: mediaRecords.length,
         media: mediaRecords.map((m) => ({
           id: m.id,
