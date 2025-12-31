@@ -43,6 +43,16 @@ const register = (socket, users, io) => {
             connections[existingIndex].deviceType = deviceType;
             console.log(`User re-registered: ${email} -> ${socket.id} (${deviceType})`);
         } else {
+            // Check if there's already a connection with this device type
+            // Only allow one connection per device type (e.g., one 'mobile', one 'brigid-pi')
+            const existingDeviceIndex = connections.findIndex(conn => conn.deviceType === deviceType);
+            if (existingDeviceIndex !== -1) {
+                const oldSocketId = connections[existingDeviceIndex].socketId;
+                console.log(`Replacing existing ${deviceType} connection: ${oldSocketId} -> ${socket.id}`);
+                // Remove the old connection
+                connections.splice(existingDeviceIndex, 1);
+            }
+
             // Add new connection
             connections.push({
                 socketId: socket.id,
