@@ -44,3 +44,7 @@ terraform/initial-app.zip
 # Note: CA key is committed for EB deployment (dev CA only)
 # For production, use AWS Secrets Manager
 # certs/*.key
+
+# Firebase credentials
+firebase-service-account.json
+FirebaseCredentials/
