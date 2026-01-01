@@ -76,6 +76,7 @@ const register = (socket, users, io) => {
 
         if (pendingCall) {
             console.log(`[Register] Found pending call for ${email} from ${pendingCall.callerEmail}`);
+            console.log(`[Register] Pending call has offer: ${!!pendingCall.offer}`);
 
             // Get caller's socket
             const callerSocketId = getPreferredSocketId(pendingCall.callerEmail);
@@ -87,17 +88,32 @@ const register = (socket, users, io) => {
                     message: 'Recipient is now online, initiating call'
                 });
 
-                // Notify recipient about incoming call
-                io.to(socket.id).emit('message', {
-                    type: 'WEBRTC',
-                    fromEmail: pendingCall.callerEmail,
-                    message: pendingCall.metadata?.message || 'call'
-                });
+                // Send the stored offer to the recipient
+                if (pendingCall.offer) {
+                    io.to(socket.id).emit('offer', {
+                        from: pendingCall.callerEmail,
+                        offer: pendingCall.offer,
+                        callId: pendingCall.callId
+                    });
+                    console.log(`[Register] Sent stored offer to ${email}, callId: ${pendingCall.callId}`);
+                } else {
+                    // Fallback: notify recipient about incoming call (legacy flow)
+                    io.to(socket.id).emit('message', {
+                        type: 'WEBRTC',
+                        fromEmail: pendingCall.callerEmail,
+                        message: pendingCall.metadata?.message || 'call'
+                    });
+                    console.log(`[Register] No offer stored, sent legacy message to ${email}`);
+                }
 
                 console.log(`[Register] Initiated call between ${pendingCall.callerEmail} and ${email}`);
             } else {
                 console.log(`[Register] Caller ${pendingCall.callerEmail} is no longer online`);
-                // Optionally notify recipient that caller is gone
+                // Notify recipient that caller is gone
+                io.to(socket.id).emit('call_cancelled', {
+                    fromEmail: pendingCall.callerEmail,
+                    reason: 'caller_offline'
+                });
             }
 
             // Remove from queue

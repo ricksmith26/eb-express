@@ -1,4 +1,4 @@
-import {getUserEmail, getPreferredSocketId, getUserConnections} from '../socketIo.js'
+import {getUserEmail, getPreferredSocketId, getUserConnections, addPendingCall} from '../socketIo.js'
 import callHistoryService from '../../services/call-history-service.js';
 import User from '../../models/User.js';
 import { sendCallNotification } from '../../services/pushNotificationService.js';
@@ -83,7 +83,7 @@ const callUser = (socket, users, io) => {
                     });
 
                     // Send push notification (offer exchanged via socket when app opens)
-                    const tickets = await sendCallNotification(
+                    await sendCallNotification(
                         recipient.pushNotificationTokens,
                         {
                             fromEmail: callerEmail,
@@ -91,6 +91,15 @@ const callUser = (socket, users, io) => {
                             callId: communication.callMetadata.callId
                         }
                     );
+
+                    // Queue the call with offer so it can be sent when recipient connects
+                    addPendingCall(toEmail, callerEmail, {
+                        offer,
+                        callId: communication.callMetadata.callId,
+                        callerName: callerName || callerEmail
+                    });
+
+                    console.log(`[CallUser] Pending call queued for ${toEmail} with offer`);
 
                     // Send callId back to caller
                     socket.emit("callInitiated", {
