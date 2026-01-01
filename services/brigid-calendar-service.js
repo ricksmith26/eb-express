@@ -373,15 +373,29 @@ class BrigidCalendarService {
   }
 
   async _scheduleReminders(event) {
-    if (!this.agenda || event.status !== 'scheduled') return;
+    if (!this.agenda) {
+      console.log(`${LOG_PREFIX} No agenda instance - skipping reminder scheduling`);
+      return;
+    }
+    if (event.status !== 'scheduled') {
+      console.log(`${LOG_PREFIX} Event status is ${event.status} - skipping reminder scheduling`);
+      return;
+    }
 
     const jobIds = [];
     const now = new Date();
 
+    console.log(`${LOG_PREFIX} Scheduling reminders for event ${event.id}, startTime: ${event.startTime}, now: ${now}`);
+    console.log(`${LOG_PREFIX} Event has ${event.reminders?.length || 0} reminders`);
+
     for (const reminder of event.reminders) {
-      if (reminder.sent) continue;
+      if (reminder.sent) {
+        console.log(`${LOG_PREFIX} Reminder already sent, skipping`);
+        continue;
+      }
 
       const reminderTime = new Date(event.startTime.getTime() - reminder.minutesBefore * 60 * 1000);
+      console.log(`${LOG_PREFIX} Reminder ${reminder.minutesBefore}min before -> reminderTime: ${reminderTime}`);
 
       if (reminderTime > now) {
         const job = await this.agenda.schedule(reminderTime, 'brigid-calendar-reminder', {
@@ -395,6 +409,9 @@ class BrigidCalendarService {
         });
 
         jobIds.push(job.attrs._id.toString());
+        console.log(`${LOG_PREFIX} Scheduled reminder job at ${reminderTime}`);
+      } else {
+        console.log(`${LOG_PREFIX} Reminder time ${reminderTime} is in the past, skipping`);
       }
     }
 
@@ -402,6 +419,8 @@ class BrigidCalendarService {
       event._brigid.agendaJobIds = jobIds;
       await event.save();
       console.log(`${LOG_PREFIX} Scheduled ${jobIds.length} reminders for event ${event.id}`);
+    } else {
+      console.log(`${LOG_PREFIX} No reminders scheduled for event ${event.id} (all in past or none defined)`);
     }
   }
 
