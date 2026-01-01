@@ -397,8 +397,15 @@ class BrigidCalendarService {
       const reminderTime = new Date(event.startTime.getTime() - reminder.minutesBefore * 60 * 1000);
       console.log(`${LOG_PREFIX} Reminder ${reminder.minutesBefore}min before -> reminderTime: ${reminderTime}`);
 
-      if (reminderTime > now) {
-        const job = await this.agenda.schedule(reminderTime, 'brigid-calendar-reminder', {
+      // If reminder time is in the past but event hasn't started, schedule for 1 minute from now
+      let scheduleTime = reminderTime;
+      if (reminderTime <= now && event.startTime > now) {
+        scheduleTime = new Date(now.getTime() + 60 * 1000); // 1 minute from now
+        console.log(`${LOG_PREFIX} Reminder time was in past, scheduling for ${scheduleTime} instead`);
+      }
+
+      if (scheduleTime > now) {
+        const job = await this.agenda.schedule(scheduleTime, 'brigid-calendar-reminder', {
           eventId: event.id,
           reminderId: reminder.id,
           ownerEmail: event.ownerEmail,
@@ -409,9 +416,9 @@ class BrigidCalendarService {
         });
 
         jobIds.push(job.attrs._id.toString());
-        console.log(`${LOG_PREFIX} Scheduled reminder job at ${reminderTime}`);
+        console.log(`${LOG_PREFIX} Scheduled reminder job at ${scheduleTime}`);
       } else {
-        console.log(`${LOG_PREFIX} Reminder time ${reminderTime} is in the past, skipping`);
+        console.log(`${LOG_PREFIX} Event already started, skipping reminder`);
       }
     }
 
