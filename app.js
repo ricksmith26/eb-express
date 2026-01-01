@@ -24,6 +24,8 @@ import callHistoryRoutes from './routes/call-history-routes.js';
 import deviceRoutes from './routes/deviceRoutes.js';
 import auditEventRoutes from './routes/auditEventRoutes.js';
 import patientMediaRoutes from './routes/patient-media-routes.js';
+import brigidCalendarRoutes from './routes/brigid-calendar-routes.js';
+import brigidCalendarService from './services/brigid-calendar-service.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
 import MongoStore from "connect-mongo";
@@ -146,6 +148,11 @@ app.use('/withings', withingsRoutes);
 app.use('/device', deviceRoutes);
 app.use('/auditEvent', auditEventRoutes);
 app.use('/api/patient-media', patientMediaRoutes);
+app.use('/brigid-calendar', brigidCalendarRoutes);
+
+// Inject Socket.IO into Brigid Calendar Service for real-time notifications
+brigidCalendarService.setSocketIO(io);
+
 setupAgenda()
 
 function getUserEmail(socketId) {

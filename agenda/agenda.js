@@ -1,10 +1,13 @@
 import Agenda from 'agenda';
 import CalendarController from '../controllers/calendar-controller.js'
 import User from '../models/User.js';
+import BrigidCalendarEvent from '../models/BrigidCalendarEvent.js';
 import { getPreferredSocketId } from '../socketIo/socketIo.js';
 import {io as IO} from '../app.js'
 import moment from 'moment';
 import { WithingsService } from '../services/WithingsService.js';
+import brigidCalendarService from '../services/brigid-calendar-service.js';
+import { sendEventReminderNotification } from '../services/pushNotificationService.js';
 import {
     WITHINGS_CLIENT_ID,
     WITHINGS_CLIENT_SECRET,
@@ -231,6 +234,76 @@ export const setupAgenda = async (io) => {
             throw error;
         }
     });
+
+    /**
+     * Brigid Calendar Reminder Job
+     * Triggered at the scheduled reminder time for each event
+     */
+    agenda.define('brigid-calendar-reminder', async (job) => {
+        const {
+            eventId,
+            reminderId,
+            ownerEmail,
+            inviteeEmails,
+            eventTitle,
+            eventStartTime,
+            method
+        } = job.attrs.data;
+
+        console.log(`🔔 [Agenda] Brigid calendar reminder for event: ${eventId}`);
+
+        try {
+            const event = await BrigidCalendarEvent.findOne({ id: eventId });
+
+            if (!event || event.status !== 'scheduled') {
+                console.log(`⚠️ [Agenda] Skipping reminder - event cancelled or not found: ${eventId}`);
+                return;
+            }
+
+            const reminder = event.reminders.find(r => r.id === reminderId);
+            if (reminder) {
+                reminder.sent = true;
+                reminder.sentAt = new Date();
+                await event.save();
+            }
+
+            const allRecipients = [ownerEmail, ...inviteeEmails.filter(e => e !== ownerEmail)];
+
+            for (const email of allRecipients) {
+                const socketId = getPreferredSocketId(email);
+                if (socketId) {
+                    IO.to(socketId).emit('brigidCalendarReminder', {
+                        eventId,
+                        title: eventTitle,
+                        startTime: eventStartTime,
+                        message: `Reminder: ${eventTitle} starts at ${moment(eventStartTime).format('LT')}`
+                    });
+                    console.log(`🔔 [Agenda] Socket reminder sent to ${email}`);
+                }
+
+                if (method === 'push') {
+                    const user = await User.findOne({ email });
+                    if (user && user.pushNotificationTokens?.length > 0) {
+                        await sendEventReminderNotification(user.pushNotificationTokens, {
+                            eventId,
+                            eventTitle,
+                            eventStartTime
+                        });
+                        console.log(`🔔 [Agenda] Push reminder sent to ${email}`);
+                    }
+                }
+            }
+
+            console.log(`✅ [Agenda] Sent reminder for event ${eventId} to ${allRecipients.length} recipients`);
+
+        } catch (error) {
+            console.error(`❌ [Agenda] Error processing brigid calendar reminder:`, error);
+            throw error;
+        }
+    });
+
+    // Inject agenda into brigid calendar service
+    brigidCalendarService.setAgenda(agenda);
 
     await agenda.start(); // ✅ Wait for Agenda to initialize before scheduling
     // await agenda.schedule('in 5 seconds', 'schedule daily events'); // Safe now

@@ -188,7 +188,75 @@ export async function sendMessageNotification(pushTokens, messageData) {
   return results;
 }
 
+/**
+ * Send a push notification for a calendar event reminder
+ * @param {Array} pushTokens - Array of FCM push tokens
+ * @param {Object} eventData - Event information
+ * @param {string} eventData.eventId - Event ID
+ * @param {string} eventData.eventTitle - Event title
+ * @param {Date} eventData.eventStartTime - Event start time
+ * @returns {Promise<Array>} Array of message IDs
+ */
+export async function sendEventReminderNotification(pushTokens, eventData) {
+  if (!firebaseInitialized) {
+    console.error('[PushNotificationService] Firebase not initialized, cannot send notification');
+    return [];
+  }
+
+  const { eventId, eventTitle, eventStartTime } = eventData;
+  const results = [];
+
+  for (const pushToken of pushTokens) {
+    try {
+      const message = {
+        token: pushToken.token,
+        notification: {
+          title: 'Event Reminder',
+          body: `${eventTitle} starts at ${new Date(eventStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        },
+        data: {
+          type: 'calendar_reminder',
+          eventId: eventId || '',
+          eventTitle: eventTitle || '',
+          eventStartTime: eventStartTime?.toString() || '',
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            icon: 'notification_icon',
+            color: '#4CAF50',
+            channelId: 'calendar',
+            sound: 'default',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+            },
+          },
+        },
+      };
+
+      const response = await admin.messaging().send(message);
+      console.log('[PushNotificationService] Successfully sent calendar reminder:', response);
+      results.push(response);
+    } catch (error) {
+      console.error('[PushNotificationService] Error sending calendar reminder:', error);
+
+      if (error.code === 'messaging/invalid-registration-token' ||
+          error.code === 'messaging/registration-token-not-registered') {
+        console.log('[PushNotificationService] Token is invalid and should be removed:', pushToken.token);
+      }
+    }
+  }
+
+  return results;
+}
+
 export default {
   sendCallNotification,
   sendMessageNotification,
+  sendEventReminderNotification,
 };
