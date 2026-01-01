@@ -38,17 +38,24 @@ initializeFirebase();
  * @param {string} callData.fromEmail - Caller's email
  * @param {string} callData.fromName - Caller's name
  * @param {string} callData.callId - Call ID
- * @param {Object} callData.offer - WebRTC offer (optional)
+ * Note: WebRTC offer is NOT included - too large for FCM (4KB limit)
+ * The offer should be exchanged via socket after app opens
  * @returns {Promise<Array>} Array of message IDs
  */
 export async function sendCallNotification(pushTokens, callData) {
-  console.log(callData, '<<<callData<<')
+  // Don't log full callData as it may contain large offer objects
+  console.log('[PushNotificationService] sendCallNotification called for:', {
+    fromEmail: callData.fromEmail,
+    fromName: callData.fromName,
+    callId: callData.callId,
+    tokenCount: pushTokens?.length
+  });
   if (!firebaseInitialized) {
     console.error('[PushNotificationService] Firebase not initialized, cannot send notification');
     return [];
   }
 
-  const { fromEmail, fromName, callId, offer } = callData;
+  const { fromEmail, fromName, callId } = callData;
   const results = [];
 
   for (const pushToken of pushTokens) {
@@ -65,7 +72,8 @@ export async function sendCallNotification(pushTokens, callData) {
           callId: callId || '',
           fromEmail: fromEmail || '',
           fromName: fromName || '',
-          offer: offer ? JSON.stringify(offer) : '',
+          // Note: offer intentionally NOT included - exceeds FCM 4KB limit
+          // App should fetch offer via socket after opening
         },
         android: {
           priority: 'high',

@@ -16,6 +16,7 @@ class PatientRoutes {
 
   initializeRoutes() {
     // Protected route - requires JWT authentication
+    // this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
     this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
 
     // Public/admin routes (you may want to add auth here too)

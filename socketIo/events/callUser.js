@@ -50,28 +50,8 @@ const callUser = (socket, users, io) => {
 
                 console.log(`[CallUser] Call initiated from ${callerEmail} to ${toEmail}, callId: ${communication.callMetadata.callId}`);
 
-                // BACKUP: Always send push notification to mobile devices
-                // This ensures delivery even if socket is stale/disconnected
-                if (deviceType === 'mobile') {
-                    try {
-                        const recipient = await User.findOne({ email: toEmail });
-                        if (recipient && recipient.pushNotificationTokens && recipient.pushNotificationTokens.length > 0) {
-                            console.log(`[CallUser] Sending backup push notification to mobile device (${recipient.pushNotificationTokens.length} tokens)`);
-                            await sendCallNotification(
-                                recipient.pushNotificationTokens,
-                                {
-                                    fromEmail: callerEmail,
-                                    fromName: callerName || callerEmail,
-                                    callId: communication.callMetadata.callId,
-                                    offer
-                                }
-                            );
-                            console.log(`[CallUser] Backup push notification sent`);
-                        }
-                    } catch (pushError) {
-                        console.error(`[CallUser] Error sending backup push notification:`, pushError);
-                    }
-                }
+                // No push notification needed - user is connected via socket
+                console.log(`[CallUser] User ${toEmail} is connected, no push notification needed`);
             } catch (error) {
                 console.error(`[CallUser] Error creating call history:`, error);
                 // Still emit the offer even if history logging fails
@@ -102,14 +82,13 @@ const callUser = (socket, users, io) => {
                         medium: 'VIDEOCONF'
                     });
 
-                    // Send push notification with call data
+                    // Send push notification (offer exchanged via socket when app opens)
                     const tickets = await sendCallNotification(
                         recipient.pushNotificationTokens,
                         {
                             fromEmail: callerEmail,
                             fromName: callerName || callerEmail,
-                            callId: communication.callMetadata.callId,
-                            offer
+                            callId: communication.callMetadata.callId
                         }
                     );
 
