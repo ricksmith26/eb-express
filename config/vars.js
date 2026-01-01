@@ -10,7 +10,8 @@ export const {
     GOOGLE_CALLBACK_URL,
     WITHINGS_CLIENT_ID,
     WITHINGS_CLIENT_SECRET,
-    WITHINGS_CALLBACK_URL
+    WITHINGS_CALLBACK_URL,
+    AGENT_API_KEY
 } = process.env;
 
 console.log({

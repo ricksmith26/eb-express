@@ -1,6 +1,6 @@
 import express from 'express';
 import BrigidCalendarController from '../controllers/brigid-calendar-controller.js';
-import { verifyAccessToken } from '../middleware/auth.js';
+import { verifyAccessTokenOrApiKey } from '../middleware/auth.js';
 
 class BrigidCalendarRoutes {
   constructor() {
@@ -15,7 +15,7 @@ class BrigidCalendarRoutes {
     // POST /brigid-calendar/events
     this.router.post(
       '/events',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.createEvent
     );
 
@@ -24,7 +24,7 @@ class BrigidCalendarRoutes {
     // Query params: startDate, endDate, status, limit, skip, role (owner|invitee)
     this.router.get(
       '/events',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.getMyEvents
     );
 
@@ -32,7 +32,7 @@ class BrigidCalendarRoutes {
     // GET /brigid-calendar/events/today
     this.router.get(
       '/events/today',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.getTodayEvents
     );
 
@@ -40,7 +40,7 @@ class BrigidCalendarRoutes {
     // GET /brigid-calendar/events/range?startDate=...&endDate=...
     this.router.get(
       '/events/range',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.getEventsByDateRange
     );
 
@@ -48,7 +48,7 @@ class BrigidCalendarRoutes {
     // GET /brigid-calendar/events/user/:email
     this.router.get(
       '/events/user/:email',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.getUserEvents
     );
 
@@ -56,7 +56,7 @@ class BrigidCalendarRoutes {
     // GET /brigid-calendar/events/:eventId
     this.router.get(
       '/events/:eventId',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.getEvent
     );
 
@@ -64,7 +64,7 @@ class BrigidCalendarRoutes {
     // PUT /brigid-calendar/events/:eventId
     this.router.put(
       '/events/:eventId',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.updateEvent
     );
 
@@ -72,7 +72,7 @@ class BrigidCalendarRoutes {
     // DELETE /brigid-calendar/events/:eventId
     this.router.delete(
       '/events/:eventId',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.deleteEvent
     );
 
@@ -81,7 +81,7 @@ class BrigidCalendarRoutes {
     // Body: { response: 'accepted' | 'declined' | 'tentative' }
     this.router.post(
       '/events/:eventId/rsvp',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.respondToInvitation
     );
 
@@ -90,7 +90,7 @@ class BrigidCalendarRoutes {
     // Body: { emails: ['email1@example.com', 'email2@example.com'] }
     this.router.post(
       '/events/:eventId/invitees',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.addInvitees
     );
 
@@ -98,7 +98,7 @@ class BrigidCalendarRoutes {
     // DELETE /brigid-calendar/events/:eventId/invitees/:inviteeEmail
     this.router.delete(
       '/events/:eventId/invitees/:inviteeEmail',
-      verifyAccessToken,
+      verifyAccessTokenOrApiKey,
       this.controller.removeInvitee
     );
   }

@@ -119,6 +119,122 @@ export const verifyRefreshToken = async (req, res, next) => {
 };
 
 /**
+ * Middleware to verify API key for agent/service-to-service calls
+ * Usage: Add to routes that need to support AI agent access
+ */
+export const verifyApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+
+  if (!apiKey) {
+    return res.status(401).json({
+      error: "API key required",
+      code: "NO_API_KEY"
+    });
+  }
+
+  if (apiKey !== process.env.AGENT_API_KEY) {
+    return res.status(401).json({
+      error: "Invalid API key",
+      code: "INVALID_API_KEY"
+    });
+  }
+
+  // For API key auth, the agent must specify the user email in the request
+  // Check header first, then body
+  const agentUserEmail = req.headers['x-agent-user-email'] || req.body?.userEmail;
+
+  if (!agentUserEmail) {
+    return res.status(400).json({
+      error: "Agent must specify user email via X-Agent-User-Email header or userEmail in body",
+      code: "NO_USER_EMAIL"
+    });
+  }
+
+  req.user = {
+    email: agentUserEmail,
+    isAgent: true
+  };
+
+  next();
+};
+
+/**
+ * Middleware that accepts either JWT token OR API key
+ * Use this for endpoints that need to support both user and agent access
+ */
+export const verifyAccessTokenOrApiKey = async (req, res, next) => {
+  // Check for API key first
+  const apiKey = req.headers['x-api-key'];
+
+  if (apiKey) {
+    // Validate API key
+    if (apiKey !== process.env.AGENT_API_KEY) {
+      return res.status(401).json({
+        error: "Invalid API key",
+        code: "INVALID_API_KEY"
+      });
+    }
+
+    // For API key auth, the agent must specify the user email
+    const agentUserEmail = req.headers['x-agent-user-email'] || req.body?.userEmail;
+
+    if (!agentUserEmail) {
+      return res.status(400).json({
+        error: "Agent must specify user email via X-Agent-User-Email header or userEmail in body",
+        code: "NO_USER_EMAIL"
+      });
+    }
+
+    req.user = {
+      email: agentUserEmail,
+      isAgent: true
+    };
+
+    return next();
+  }
+
+  // Fall back to JWT verification
+  try {
+    const authHeader = req.headers.authorization;
+    const cookieToken = req.cookies?.accessToken;
+    const token = authHeader?.replace("Bearer ", "") || cookieToken;
+
+    if (!token) {
+      return res.status(401).json({
+        error: "Authentication required",
+        code: "NO_TOKEN"
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = {
+      id: decoded.id,
+      email: decoded.email
+    };
+
+    next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        error: "Token expired",
+        code: "TOKEN_EXPIRED"
+      });
+    }
+
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        error: "Invalid token",
+        code: "INVALID_TOKEN"
+      });
+    }
+
+    console.error("Auth middleware error:", error);
+    res.status(500).json({ error: "Authentication failed" });
+  }
+};
+
+/**
  * Helper function to get user from JWT token (for migration purposes)
  * This extracts and verifies the token, returning the user object
  */
