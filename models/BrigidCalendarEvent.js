@@ -237,8 +237,17 @@ BrigidCalendarEventSchema.statics.findUserEvents = function(email, options = {})
   if (status) query.status = status;
   if (startDate || endDate) {
     query.startTime = {};
-    if (startDate) query.startTime.$gte = new Date(startDate);
-    if (endDate) query.startTime.$lte = new Date(endDate);
+    if (startDate) {
+      query.startTime.$gte = new Date(startDate);
+    }
+    if (endDate) {
+      // If endDate is a date string (YYYY-MM-DD), set to end of that day
+      const end = new Date(endDate);
+      if (typeof endDate === 'string' && endDate.length === 10) {
+        end.setUTCHours(23, 59, 59, 999);
+      }
+      query.startTime.$lte = end;
+    }
   }
 
   return this.find(query)
