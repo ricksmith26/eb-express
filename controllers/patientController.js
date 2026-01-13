@@ -1,4 +1,5 @@
 import Patient from '../models/PatientSchema.js';
+import RelatedPerson from '../models/RelatedPerson.js';
 
 class PatientController {
   constructor() {
@@ -7,6 +8,7 @@ class PatientController {
     this.updatePatient = this.updatePatient.bind(this);
     this.deletePatient = this.deletePatient.bind(this);
     this.getPatientByEmail = this.getPatientByEmail.bind(this);
+    this.lookupPatient = this.lookupPatient.bind(this);
   }
 
   async createPatient(req, res) {
@@ -61,6 +63,47 @@ class PatientController {
 
       res.json(patient);
     } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * Lookup patient by phone number or email
+   * GET /patient/lookup?phone={phone} or GET /patient/lookup?email={email}
+   * Returns { patient, contacts } or 404 if not found
+   */
+  async lookupPatient(req, res) {
+    try {
+      const { phone, email } = req.query;
+
+      if (!phone && !email) {
+        return res.status(400).json({ error: "Either phone or email query parameter is required" });
+      }
+
+      let patient;
+      if (phone) {
+        // Lookup by phone number
+        patient = await Patient.findOne({
+          telecom: { $elemMatch: { system: "phone", value: phone } }
+        });
+      } else if (email) {
+        // Lookup by email
+        patient = await Patient.findOne({
+          telecom: { $elemMatch: { system: "email", value: email } }
+        });
+      }
+
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Fetch related contacts for this patient
+      const patientReference = `Patient/${patient._id}`;
+      const contacts = await RelatedPerson.find({ "patient.reference": patientReference });
+
+      res.json({ patient, contacts });
+    } catch (error) {
+      console.error("Error in lookupPatient:", error);
       res.status(500).json({ error: error.message });
     }
   }

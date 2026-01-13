@@ -19,6 +19,9 @@ class PatientRoutes {
     // this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
     this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
 
+    // Patient lookup by phone or email (for call center)
+    this.router.get("/lookup", this.controller.lookupPatient);
+
     // Public/admin routes (you may want to add auth here too)
     this.router.get("/", this.controller.getPatients);
     this.router.post("/", this.controller.createPatient);

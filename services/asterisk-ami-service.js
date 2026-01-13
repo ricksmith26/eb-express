@@ -62,6 +62,7 @@ class AsteriskAMIService {
         // Queue events - when call completes
         this.ami.on('agentcomplete', (event) => {
             console.log(`${LOG_PREFIX} [AgentComplete] Call completed:`, JSON.stringify(event));
+            this.handleAgentComplete(event);
         });
 
         return this;
@@ -97,6 +98,27 @@ class AsteriskAMIService {
             console.log(`${LOG_PREFIX} Customer added to queue controller:`, result);
         } catch (error) {
             console.error(`${LOG_PREFIX} Error adding customer to queue:`, error);
+        }
+    }
+
+    /**
+     * Handle when a call completes - remove agent from Asterisk queue
+     */
+    async handleAgentComplete(event) {
+        const { Queue, Member, MemberName } = event;
+
+        if (Queue !== 'inbound-queue') {
+            console.log(`${LOG_PREFIX} Ignoring agentcomplete for queue: ${Queue}`);
+            return;
+        }
+
+        console.log(`${LOG_PREFIX} Call completed for agent: ${Member} (${MemberName}) - removing from queue`);
+
+        try {
+            await this.removeAgentFromAsteriskQueue(Member, Queue);
+            console.log(`${LOG_PREFIX} Agent ${Member} removed from Asterisk queue after call completion`);
+        } catch (error) {
+            console.error(`${LOG_PREFIX} Error removing agent from queue after call:`, error);
         }
     }
 
