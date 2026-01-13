@@ -2,6 +2,7 @@
 // import qs from 'qs';
 import { io } from '../app.js';
 // import { users } from '../socketIo/socketIo.js';
+import asteriskAMI from '../services/asterisk-ami-service.js';
 
 const LOG_PREFIX = '[QueueController]';
 
@@ -115,6 +116,15 @@ export class QueueController {
             agent: pairing.agent?.username || pairing.agent?.id || 'unknown'
         }));
         this.logQueueState('pairCustomerAndAgent-after');
+
+        // If customer is an inbound phone call, add agent to Asterisk queue
+        if (pairing.customer?.type === 'inbound-phone' && pairing.agent?.sipEndpoint) {
+            console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Inbound phone call - adding agent to Asterisk queue`);
+            asteriskAMI.addAgentToAsteriskQueue(pairing.agent.sipEndpoint, 'inbound-queue')
+                .then(() => console.log(`${LOG_PREFIX} Agent added to Asterisk queue`))
+                .catch(err => console.error(`${LOG_PREFIX} Failed to add agent to Asterisk queue:`, err));
+        }
+
         return pairing;
     }
 

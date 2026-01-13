@@ -26,6 +26,7 @@ import auditEventRoutes from './routes/auditEventRoutes.js';
 import patientMediaRoutes from './routes/patient-media-routes.js';
 import brigidCalendarRoutes from './routes/brigid-calendar-routes.js';
 import brigidCalendarService from './services/brigid-calendar-service.js';
+import asteriskAMI from './services/asterisk-ami-service.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
 import MongoStore from "connect-mongo";
@@ -152,6 +153,19 @@ app.use('/brigid-calendar', brigidCalendarRoutes);
 
 // Inject Socket.IO into Brigid Calendar Service for real-time notifications
 brigidCalendarService.setSocketIO(io);
+
+// Initialize Asterisk AMI connection for queue management
+if (process.env.ASTERISK_AMI_HOST) {
+  asteriskAMI.connect({
+    host: process.env.ASTERISK_AMI_HOST,
+    port: process.env.ASTERISK_AMI_PORT || 5038,
+    username: process.env.ASTERISK_AMI_USERNAME || 'brigid-backend',
+    password: process.env.ASTERISK_AMI_PASSWORD
+  });
+  console.log('🔌 Asterisk AMI connection initialized');
+} else {
+  console.log('⚠️  ASTERISK_AMI_HOST not set - AMI integration disabled');
+}
 
 setupAgenda()
 
