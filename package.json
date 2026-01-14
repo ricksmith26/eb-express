@@ -7,6 +7,7 @@
     "start": "node ./bin/www",
     "dev": "nodemon ./bin/www",
     "ssh": "ssh -i ~/.ssh/ai-fhir-server.pem ec2-user@18.175.192.81",
+    "eb": "~/.local/bin/eb",
     "deploy": "~/.local/bin/eb deploy",
     "logs": "~/.local/bin/eb logs --stream"
   },

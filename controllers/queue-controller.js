@@ -118,10 +118,11 @@ export class QueueController {
         this.logQueueState('pairCustomerAndAgent-after');
 
         // If customer is an inbound phone call, add agent to Asterisk queue
-        if (pairing.customer?.type === 'inbound-phone' && pairing.agent?.sipEndpoint) {
-            console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Inbound phone call - adding agent to Asterisk queue`);
-            asteriskAMI.addAgentToAsteriskQueue(pairing.agent.sipEndpoint, 'inbound-queue')
-                .then(() => console.log(`${LOG_PREFIX} Agent added to Asterisk queue`))
+        if (pairing.customer?.type === 'inbound-phone' && pairing.agent?.username) {
+            const agentInterface = `PJSIP/${pairing.agent.username}`;
+            console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Inbound phone call - adding agent ${agentInterface} to Asterisk queue`);
+            asteriskAMI.addAgentToAsteriskQueue(agentInterface, 'inbound-queue')
+                .then(() => console.log(`${LOG_PREFIX} Agent ${agentInterface} added to Asterisk queue`))
                 .catch(err => console.error(`${LOG_PREFIX} Failed to add agent to Asterisk queue:`, err));
         }
 

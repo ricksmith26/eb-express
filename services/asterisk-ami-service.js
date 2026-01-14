@@ -72,23 +72,24 @@ class AsteriskAMIService {
      * Handle when a Twilio caller joins the inbound queue
      */
     async handleCallerJoinQueue(event) {
-        const { Queue, Channel, CallerIDNum, CallerIDName, Position } = event;
+        // Note: asterisk-manager returns lowercase property names
+        const { queue, channel, calleridnum, calleridname, position } = event;
 
-        if (Queue !== 'inbound-queue') {
-            console.log(`${LOG_PREFIX} Ignoring event for queue: ${Queue}`);
+        if (queue !== 'inbound-queue') {
+            console.log(`${LOG_PREFIX} Ignoring event for queue: ${queue}`);
             return;
         }
 
-        console.log(`${LOG_PREFIX} New inbound caller: ${CallerIDNum} (${CallerIDName}) in position ${Position}`);
+        console.log(`${LOG_PREFIX} New inbound caller: ${calleridnum} (${calleridname}) in position ${position}`);
 
         // Create customer object for queue controller
         const customer = {
             type: 'inbound-phone',
-            channel: Channel,
-            callerIdNum: CallerIDNum,
-            callerIdName: CallerIDName,
-            queue: Queue,
-            position: Position,
+            channel: channel,
+            callerIdNum: calleridnum,
+            callerIdName: calleridname,
+            queue: queue,
+            position: position,
             timestamp: new Date().toISOString()
         };
 
@@ -105,18 +106,20 @@ class AsteriskAMIService {
      * Handle when a call completes - remove agent from Asterisk queue
      */
     async handleAgentComplete(event) {
-        const { Queue, Member, MemberName } = event;
+        // Note: asterisk-manager returns lowercase property names
+        // interface is the SIP endpoint, membername is the display name
+        const { queue, interface: agentInterface, membername } = event;
 
-        if (Queue !== 'inbound-queue') {
-            console.log(`${LOG_PREFIX} Ignoring agentcomplete for queue: ${Queue}`);
+        if (queue !== 'inbound-queue') {
+            console.log(`${LOG_PREFIX} Ignoring agentcomplete for queue: ${queue}`);
             return;
         }
 
-        console.log(`${LOG_PREFIX} Call completed for agent: ${Member} (${MemberName}) - removing from queue`);
+        console.log(`${LOG_PREFIX} Call completed for agent: ${agentInterface} (${membername}) - removing from queue`);
 
         try {
-            await this.removeAgentFromAsteriskQueue(Member, Queue);
-            console.log(`${LOG_PREFIX} Agent ${Member} removed from Asterisk queue after call completion`);
+            await this.removeAgentFromAsteriskQueue(agentInterface, queue);
+            console.log(`${LOG_PREFIX} Agent ${agentInterface} removed from Asterisk queue after call completion`);
         } catch (error) {
             console.error(`${LOG_PREFIX} Error removing agent from queue after call:`, error);
         }
