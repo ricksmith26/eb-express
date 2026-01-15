@@ -132,6 +132,7 @@ app.use(cookieParser());
 connectDB();
 app.use("/auth", authRoutes);
 app.use('/patients', patientsRouter);
+app.use('/patient', patientsRouter);  // Also support singular
 app.use('/users', usersRouter);
 app.use("/relatedPerson", relatedPersonRoutes);
 app.use("/images", imagesRouter)
