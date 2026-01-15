@@ -127,6 +127,7 @@ const FhirDeviceSchema = new mongoose.Schema({
 // Compound indexes for common queries
 FhirDeviceSchema.index({ 'identifier.system': 1, 'identifier.value': 1 });
 FhirDeviceSchema.index({ 'owner.email': 1, status: 1 });
+FhirDeviceSchema.index({ 'owner.reference': 1, status: 1 });  // For org-scoped queries
 FhirDeviceSchema.index({ status: 1, lastSeenAt: -1 });
 
 // Instance method: Get device ID (first 16 chars of fingerprint)

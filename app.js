@@ -26,6 +26,14 @@ import auditEventRoutes from './routes/auditEventRoutes.js';
 import patientMediaRoutes from './routes/patient-media-routes.js';
 import brigidCalendarRoutes from './routes/brigid-calendar-routes.js';
 import brigidCalendarService from './services/brigid-calendar-service.js';
+
+// Admin Portal Routes
+import adminAuthRoutes from './routes/adminAuthRoutes.js';
+import adminOrganizationRoutes from './routes/adminOrganizationRoutes.js';
+import adminPractitionerRoutes from './routes/adminPractitionerRoutes.js';
+import adminPatientRoutes from './routes/adminPatientRoutes.js';
+import adminDeviceRoutes from './routes/adminDeviceRoutes.js';
+import adminRoleRoutes from './routes/adminRoleRoutes.js';
 import asteriskAMI from './services/asterisk-ami-service.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
@@ -70,7 +78,7 @@ const corsOptions = {
   origin: [process.env.FRONTEND_URL, "http://localhost:5173", "https://main.d1027o4nsqa17p.amplifyapp.com"], // Use FRONTEND_URL if set, otherwise allow all (dev only)
   credentials: true, // Allow cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id']
 };
 
 if (!process.env.FRONTEND_URL) {
@@ -150,6 +158,14 @@ app.use('/device', deviceRoutes);
 app.use('/auditEvent', auditEventRoutes);
 app.use('/api/patient-media', patientMediaRoutes);
 app.use('/brigid-calendar', brigidCalendarRoutes);
+
+// Admin Portal Routes (Cognito Auth)
+app.use('/admin/auth', adminAuthRoutes);
+app.use('/admin/organizations', adminOrganizationRoutes);
+app.use('/admin/practitioners', adminPractitionerRoutes);
+app.use('/admin/patients', adminPatientRoutes);
+app.use('/admin/devices', adminDeviceRoutes);
+app.use('/admin/roles', adminRoleRoutes);
 
 // Inject Socket.IO into Brigid Calendar Service for real-time notifications
 brigidCalendarService.setSocketIO(io);

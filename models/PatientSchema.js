@@ -29,8 +29,17 @@ const patientSchema = new mongoose.Schema({
       use: { type: String, enum: ["home", "work", "temp", "old", "mobile"] }
     }
   ],
-  active: { type: Boolean, default: true }
+  active: { type: Boolean, default: true },
+
+  // Managing organization (for multi-tenancy)
+  managingOrganization: {
+    reference: { type: String, index: true },  // 'Organization/{id}'
+    display: String
+  }
 });
+
+// Index for organization-scoped queries
+patientSchema.index({ 'managingOrganization.reference': 1, active: 1 });
 
 const Patient = mongoose.model('Patient', patientSchema, 'Patient');
 export default Patient;
