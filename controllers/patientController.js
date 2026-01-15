@@ -82,9 +82,27 @@ class PatientController {
 
       let patient;
       if (phone) {
-        // Lookup by phone number
+        // Generate phone number variants (UK international and local formats)
+        const phoneVariants = [phone];
+
+        if (phone.startsWith('+44')) {
+          // Convert +447939043476 to 07939043476
+          phoneVariants.push('0' + phone.slice(3));
+        } else if (phone.startsWith('0') && phone.length === 11) {
+          // Convert 07939043476 to +447939043476
+          phoneVariants.push('+44' + phone.slice(1));
+        }
+
+        console.log('Phone lookup - input:', phone, 'variants:', phoneVariants);
+
+        // Lookup by phone number (search all variants)
         patient = await Patient.findOne({
-          telecom: { $elemMatch: { system: "phone", value: phone } }
+          telecom: {
+            $elemMatch: {
+              system: "phone",
+              value: { $in: phoneVariants }
+            }
+          }
         });
       } else if (email) {
         // Lookup by email
