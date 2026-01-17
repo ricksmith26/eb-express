@@ -2,16 +2,19 @@
  * Video Feed Socket Events
  * Handles video signaling between agents (web) and devices (Pi) during emergency calls
  *
+ * Routing: Uses email-based lookup for both agents and Pi devices.
+ * - Agents are registered via registerAgent or as users
+ * - Pi devices register with the patient's email in the users map
+ *
  * Flow:
- * 1. Agent clicks "Request Camera" → emits activateVideoFeed → Pi receives
- * 2. Pi creates WebRTC offer → emits videoFeedOffer → Agent receives
- * 3. Agent creates answer → emits videoFeedAnswer → Pi receives
+ * 1. Agent clicks "Request Camera" → emits activateVideoFeed with patientEmail → Pi receives
+ * 2. Pi creates WebRTC offer → emits videoFeedOffer with agentEmail → Agent receives
+ * 3. Agent creates answer → emits videoFeedAnswer with patientEmail → Pi receives
  * 4. Both exchange ICE candidates via videoFeedIceCandidate
  * 5. Either side can emit videoFeedDisconnected to end video
  */
 
 import { getPreferredSocketId, getUserEmail, Agents } from '../socketIo.js';
-import { getDeviceSocketId } from './registerDevice.js';
 
 /**
  * Get socket ID for an agent (checks both users and Agents maps)
@@ -47,35 +50,37 @@ const getEmailBySocketId = (socketId) => {
 /**
  * Activate Video Feed - Agent → Pi
  * Sent when agent clicks "Request Camera Access" button
+ * Routes to Pi using patient's email (Pi registers with patient email in users map)
  */
 export const activateVideoFeed = (socket, users, io) => {
   socket.on('activateVideoFeed', (data) => {
-    const { deviceId, callId } = data || {};
+    const { patientEmail, callId } = data || {};
     const agentEmail = getEmailBySocketId(socket.id);
 
-    console.log(`[VideoFeed] Activate request from ${agentEmail} to device ${deviceId}`);
+    console.log(`[VideoFeed] Activate request from ${agentEmail} to patient ${patientEmail}`);
 
-    if (!deviceId) {
-      console.log('[VideoFeed] Missing deviceId in activateVideoFeed');
-      socket.emit('videoFeedError', { error: 'Device ID required' });
+    if (!patientEmail) {
+      console.log('[VideoFeed] Missing patientEmail in activateVideoFeed');
+      socket.emit('videoFeedError', { error: 'Patient email required' });
       return;
     }
 
-    const deviceSocketId = getDeviceSocketId(deviceId);
+    // Pi registers with patient's email in the users map
+    const deviceSocketId = getPreferredSocketId(patientEmail);
     if (!deviceSocketId) {
-      console.log(`[VideoFeed] Device ${deviceId} is not connected`);
+      console.log(`[VideoFeed] No device connected for patient ${patientEmail}`);
       socket.emit('videoFeedError', { error: 'Device not connected' });
       return;
     }
 
-    // Relay to device
+    // Relay to device (Pi)
     io.to(deviceSocketId).emit('activateVideoFeed', {
       callId,
       agentEmail,
       agentSocketId: socket.id
     });
 
-    console.log(`[VideoFeed] Sent activateVideoFeed to device ${deviceId}`);
+    console.log(`[VideoFeed] Sent activateVideoFeed to device for patient ${patientEmail}`);
   });
 };
 
@@ -114,58 +119,58 @@ export const videoFeedOffer = (socket, users, io) => {
 /**
  * Video Feed Answer - Agent → Pi
  * Agent sends WebRTC answer in response to offer
+ * Routes to Pi using patient's email
  */
 export const videoFeedAnswer = (socket, users, io) => {
   socket.on('videoFeedAnswer', (data) => {
-    const { callId, deviceId, answer } = data || {};
+    const { callId, patientEmail, answer } = data || {};
     const agentEmail = getEmailBySocketId(socket.id);
 
-    console.log(`[VideoFeed] Answer from ${agentEmail} to device ${deviceId}`);
+    console.log(`[VideoFeed] Answer from ${agentEmail} to patient ${patientEmail}`);
 
-    if (!deviceId) {
-      console.log('[VideoFeed] Missing deviceId in videoFeedAnswer');
+    if (!patientEmail) {
+      console.log('[VideoFeed] Missing patientEmail in videoFeedAnswer');
       return;
     }
 
-    const deviceSocketId = getDeviceSocketId(deviceId);
+    // Pi registers with patient's email in the users map
+    const deviceSocketId = getPreferredSocketId(patientEmail);
     if (!deviceSocketId) {
-      console.log(`[VideoFeed] Device ${deviceId} is not connected`);
+      console.log(`[VideoFeed] No device connected for patient ${patientEmail}`);
       return;
     }
 
-    // Relay answer to device
+    // Relay answer to device (Pi)
     io.to(deviceSocketId).emit('videoFeedAnswer', {
       callId,
       answer
     });
 
-    console.log(`[VideoFeed] Relayed answer to device ${deviceId}`);
+    console.log(`[VideoFeed] Relayed answer to device for patient ${patientEmail}`);
   });
 };
 
 /**
  * Video Feed ICE Candidate - Bi-directional
  * Both agent and device send ICE candidates to each other
+ * Agent sends with patientEmail, Pi sends with agentEmail
  */
 export const videoFeedIceCandidate = (socket, users, io) => {
   socket.on('videoFeedIceCandidate', (data) => {
-    const { callId, deviceId, agentEmail, candidate } = data || {};
+    const { callId, patientEmail, agentEmail, candidate } = data || {};
 
-    // Determine if sender is agent or device
-    const senderEmail = getEmailBySocketId(socket.id);
+    // Determine if sender is agent or device based on which email they provided
+    // Agent sends patientEmail (to route to Pi)
+    // Pi sends agentEmail (to route to agent)
 
-    if (senderEmail) {
-      // Sender is agent → relay to device
-      console.log(`[VideoFeed] ICE candidate from agent ${senderEmail} to device ${deviceId}`);
+    if (patientEmail) {
+      // Sender is agent → relay to device (Pi)
+      const senderEmail = getEmailBySocketId(socket.id);
+      console.log(`[VideoFeed] ICE candidate from agent ${senderEmail} to patient ${patientEmail}`);
 
-      if (!deviceId) {
-        console.log('[VideoFeed] Missing deviceId in ICE candidate from agent');
-        return;
-      }
-
-      const deviceSocketId = getDeviceSocketId(deviceId);
+      const deviceSocketId = getPreferredSocketId(patientEmail);
       if (!deviceSocketId) {
-        console.log(`[VideoFeed] Device ${deviceId} is not connected`);
+        console.log(`[VideoFeed] No device connected for patient ${patientEmail}`);
         return;
       }
 
@@ -173,14 +178,9 @@ export const videoFeedIceCandidate = (socket, users, io) => {
         callId,
         candidate
       });
-    } else {
-      // Sender is device → relay to agent
-      console.log(`[VideoFeed] ICE candidate from device ${deviceId} to agent ${agentEmail}`);
-
-      if (!agentEmail) {
-        console.log('[VideoFeed] Missing agentEmail in ICE candidate from device');
-        return;
-      }
+    } else if (agentEmail) {
+      // Sender is device (Pi) → relay to agent
+      console.log(`[VideoFeed] ICE candidate from device to agent ${agentEmail}`);
 
       const agentSocketId = getAgentSocketId(agentEmail);
       if (!agentSocketId) {
@@ -190,9 +190,10 @@ export const videoFeedIceCandidate = (socket, users, io) => {
 
       io.to(agentSocketId).emit('videoFeedIceCandidate', {
         callId,
-        deviceId,
         candidate
       });
+    } else {
+      console.log('[VideoFeed] ICE candidate missing both patientEmail and agentEmail');
     }
   });
 };
@@ -200,39 +201,34 @@ export const videoFeedIceCandidate = (socket, users, io) => {
 /**
  * Video Feed Disconnected - Bi-directional
  * Either side can signal video disconnection
+ * Agent sends with patientEmail, Pi sends with agentEmail
  */
 export const videoFeedDisconnected = (socket, users, io) => {
   socket.on('videoFeedDisconnected', (data) => {
-    const { callId, deviceId, agentEmail, reason } = data || {};
+    const { callId, patientEmail, agentEmail, reason } = data || {};
 
-    const senderEmail = getEmailBySocketId(socket.id);
+    if (patientEmail) {
+      // Agent is disconnecting → notify device (Pi)
+      const senderEmail = getEmailBySocketId(socket.id);
+      console.log(`[VideoFeed] Disconnect from agent ${senderEmail} to patient ${patientEmail}`);
 
-    if (senderEmail) {
-      // Agent is disconnecting → notify device
-      console.log(`[VideoFeed] Disconnect from agent ${senderEmail} to device ${deviceId}`);
-
-      if (deviceId) {
-        const deviceSocketId = getDeviceSocketId(deviceId);
-        if (deviceSocketId) {
-          io.to(deviceSocketId).emit('videoFeedDisconnected', {
-            callId,
-            reason: reason || 'Agent disconnected video'
-          });
-        }
+      const deviceSocketId = getPreferredSocketId(patientEmail);
+      if (deviceSocketId) {
+        io.to(deviceSocketId).emit('videoFeedDisconnected', {
+          callId,
+          reason: reason || 'Agent disconnected video'
+        });
       }
-    } else {
-      // Device is disconnecting → notify agent
-      console.log(`[VideoFeed] Disconnect from device ${deviceId} to agent ${agentEmail}`);
+    } else if (agentEmail) {
+      // Device (Pi) is disconnecting → notify agent
+      console.log(`[VideoFeed] Disconnect from device to agent ${agentEmail}`);
 
-      if (agentEmail) {
-        const agentSocketId = getAgentSocketId(agentEmail);
-        if (agentSocketId) {
-          io.to(agentSocketId).emit('videoFeedDisconnected', {
-            callId,
-            deviceId,
-            reason: reason || 'Device disconnected video'
-          });
-        }
+      const agentSocketId = getAgentSocketId(agentEmail);
+      if (agentSocketId) {
+        io.to(agentSocketId).emit('videoFeedDisconnected', {
+          callId,
+          reason: reason || 'Device disconnected video'
+        });
       }
     }
   });
