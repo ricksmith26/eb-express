@@ -68,7 +68,7 @@ const server = createServer(app);
 app.use('/', indexRouter);
 export const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "*", // Restrict Socket.IO to frontend URL
+    origin: [process.env.FRONTEND_URL, "http://localhost:5173", "http://localhost:5174", "https://main.d1027o4nsqa17p.amplifyapp.com"].filter(Boolean),
     credentials: true
   }
 });

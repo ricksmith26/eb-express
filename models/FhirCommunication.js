@@ -53,7 +53,7 @@ const FhirCommunicationSchema = new Schema({
       },
       code: {
         type: String,
-        enum: ['VERBAL', 'VIDEOCONF', 'ELECTRONIC'],
+        enum: ['VERBAL', 'VIDEOCONF', 'ELECTRONIC', 'WRITTEN'],
         default: 'VIDEOCONF'  // WebRTC typically includes video
       },
       display: String
@@ -138,7 +138,7 @@ const FhirCommunicationSchema = new Schema({
     },
     callType: {
       type: String,
-      enum: ['regular', 'emergency', 'scheduled'],
+      enum: ['regular', 'emergency', 'scheduled', 'manual', 'note', 'alert', 'device-activity'],
       default: 'regular'
     },
     callDuration: {
@@ -172,6 +172,7 @@ FhirCommunicationSchema.index({ 'recipient.identifier.value': 1, createdAt: -1 }
 FhirCommunicationSchema.index({ 'callMetadata.callId': 1 });
 FhirCommunicationSchema.index({ status: 1, createdAt: -1 });
 FhirCommunicationSchema.index({ 'callMetadata.isEmergency': 1, createdAt: -1 });
+FhirCommunicationSchema.index({ 'subject.reference': 1, createdAt: -1 });
 
 // Instance method to calculate call duration
 FhirCommunicationSchema.methods.calculateDuration = function() {

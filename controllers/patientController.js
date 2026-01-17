@@ -75,17 +75,17 @@ class PatientController {
 
   /**
    * Search patients by multiple criteria
-   * GET /patient/search?name={name}&phone={phone}&nhsNumber={nhs}&postcode={postcode}
+   * GET /patient/search?name={name}&phone={phone}&nhsNumber={nhs}&addressLine={address}&postcode={postcode}
    * All parameters are optional, returns patients matching ALL provided criteria
    */
   async searchPatients(req, res) {
     try {
-      const { name, phone, nhsNumber, postcode } = req.query;
+      const { name, phone, nhsNumber, addressLine, postcode } = req.query;
 
-      if (!name && !phone && !nhsNumber && !postcode) {
+      if (!name && !phone && !nhsNumber && !addressLine && !postcode) {
         return res.status(400).json({
           success: false,
-          error: "At least one search parameter is required (name, phone, nhsNumber, or postcode)"
+          error: "At least one search parameter is required (name, phone, nhsNumber, addressLine, or postcode)"
         });
       }
 
@@ -131,6 +131,14 @@ class PatientController {
             { 'identifier.value': cleanNhs },
             { 'identifier.value': nhsNumber }
           ]
+        });
+      }
+
+      // Address line search (partial match on first line of address)
+      if (addressLine) {
+        const addressRegex = new RegExp(addressLine, 'i');
+        query.$and.push({
+          'address.line': { $elemMatch: { $regex: addressRegex } }
         });
       }
 

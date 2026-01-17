@@ -37,6 +37,16 @@ const patientSchema = new mongoose.Schema({
   ],
   active: { type: Boolean, default: true },
 
+  // Medical Information
+  medicalInfo: {
+    bloodType: { type: String, enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'] },
+    gpPractice: String,
+    gpPhone: String,
+    medications: [String],
+    allergies: [String],
+    conditions: [String]
+  },
+
   // Managing organization (for multi-tenancy)
   managingOrganization: {
     reference: { type: String, index: true },  // 'Organization/{id}'

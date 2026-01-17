@@ -242,6 +242,41 @@ npm start
 
 Local server runs on: http://localhost:3000
 
+## AWS S3 Configuration
+
+### Call Recordings Bucket
+
+Call recordings are stored in the `brigid-call-recordings` S3 bucket (eu-west-2).
+
+#### CORS Configuration
+
+CORS must be configured on the bucket to allow audio playback from the admin portal:
+
+```bash
+aws s3api put-bucket-cors --bucket brigid-call-recordings --cors-configuration '{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedOrigins": [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://admin.brigid-personal-assistant.com"
+      ],
+      "ExposeHeaders": ["Content-Length", "Content-Type"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}'
+```
+
+To verify CORS configuration:
+```bash
+aws s3api get-bucket-cors --bucket brigid-call-recordings
+```
+
+**Note**: When deploying the admin portal to production, add the production URL to `AllowedOrigins`.
+
 ## Security Notes
 
 - Environment variables containing secrets are stored in AWS Elastic Beanstalk (encrypted at rest)

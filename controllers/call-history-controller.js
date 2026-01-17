@@ -9,6 +9,13 @@ class CallHistoryController {
     this.getMyCallStats = this.getMyCallStats.bind(this);
     this.getUserCallStats = this.getUserCallStats.bind(this);
     this.getFhirCallHistory = this.getFhirCallHistory.bind(this);
+    this.createTwilioCall = this.createTwilioCall.bind(this);
+    this.addCallNotes = this.addCallNotes.bind(this);
+    this.endCall = this.endCall.bind(this);
+    this.getCallHistoryByPhone = this.getCallHistoryByPhone.bind(this);
+    this.getCallHistoryByPatient = this.getCallHistoryByPatient.bind(this);
+    this.createPatientNote = this.createPatientNote.bind(this);
+    this.getPatientCommunications = this.getPatientCommunications.bind(this);
   }
 
   /**
@@ -269,6 +276,340 @@ class CallHistoryController {
           code: 'exception',
           diagnostics: error.message
         }]
+      });
+    }
+  }
+
+  /**
+   * Create a call record for Twilio/phone calls
+   * POST /call-history/twilio
+   * Body: { callerPhone, recipientPhone, direction, isEmergency, ... }
+   */
+  async createTwilioCall(req, res) {
+    try {
+      const {
+        callerPhone,
+        callerName,
+        recipientPhone,
+        recipientName,
+        recipientEmail,
+        direction,
+        isEmergency,
+        callType,
+        asteriskChannel,
+        recordingKey
+      } = req.body;
+
+      if (!callerPhone || !direction) {
+        return res.status(400).json({
+          success: false,
+          message: 'callerPhone and direction are required'
+        });
+      }
+
+      const result = await callHistoryService.initiateTwilioCall({
+        callerPhone,
+        callerName,
+        recipientPhone,
+        recipientName,
+        recipientEmail,
+        direction,
+        isEmergency,
+        callType,
+        asteriskChannel,
+        recordingKey
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Call record created',
+        data: {
+          callId: result.communication.callMetadata.callId,
+          communication: result.communication,
+          patient: result.patient ? {
+            id: result.patient.id || result.patient._id,
+            name: `${result.patient.name?.[0]?.given?.[0] || ''} ${result.patient.name?.[0]?.family || ''}`.trim()
+          } : null
+        }
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error creating Twilio call:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error creating call record',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Add notes to an existing call
+   * POST /call-history/:callId/notes
+   * Body: { content, author }
+   */
+  async addCallNotes(req, res) {
+    try {
+      const { callId } = req.params;
+      const { content, author } = req.body;
+
+      if (!callId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Call ID is required'
+        });
+      }
+
+      if (!content) {
+        return res.status(400).json({
+          success: false,
+          message: 'Note content is required'
+        });
+      }
+
+      // Use authenticated user as author if not provided
+      const noteAuthor = author || req.user?.email || 'Agent';
+
+      const communication = await callHistoryService.addCallNotes(callId, {
+        content,
+        author: noteAuthor
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Notes added to call',
+        data: communication
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error adding notes:', error);
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Error adding notes',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * End a call and update status
+   * POST /call-history/:callId/end
+   * Body: { endReason, notes, connectionQuality }
+   */
+  async endCall(req, res) {
+    try {
+      const { callId } = req.params;
+      const { endReason, notes, connectionQuality } = req.body;
+
+      if (!callId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Call ID is required'
+        });
+      }
+
+      const communication = await callHistoryService.endCall(callId, {
+        endReason,
+        notes,
+        connectionQuality
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Call ended',
+        data: communication
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error ending call:', error);
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Error ending call',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get call history by phone number
+   * GET /call-history/phone/:phone
+   */
+  async getCallHistoryByPhone(req, res) {
+    try {
+      const { phone } = req.params;
+      const { limit = 50, skip = 0 } = req.query;
+
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number is required'
+        });
+      }
+
+      const callHistory = await callHistoryService.getCallHistoryByPhone(phone, {
+        limit: parseInt(limit),
+        skip: parseInt(skip)
+      });
+
+      res.status(200).json({
+        success: true,
+        count: callHistory.length,
+        data: callHistory
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error fetching call history by phone:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching call history',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get call history by patient ID
+   * GET /call-history/patient/:patientId
+   */
+  async getCallHistoryByPatient(req, res) {
+    try {
+      const { patientId } = req.params;
+      const { limit = 50, skip = 0 } = req.query;
+
+      if (!patientId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Patient ID is required'
+        });
+      }
+
+      const callHistory = await callHistoryService.getCallHistoryByPatient(patientId, {
+        limit: parseInt(limit),
+        skip: parseInt(skip)
+      });
+
+      res.status(200).json({
+        success: true,
+        count: callHistory.length,
+        data: callHistory
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error fetching call history by patient:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching call history',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Create a patient note (Communication without call context)
+   * POST /call-history/patient/:patientId/note
+   * Body: { content, noteType }
+   */
+  async createPatientNote(req, res) {
+    try {
+      const { patientId } = req.params;
+      const { content, noteType = 'note', patientName, author: bodyAuthor } = req.body;
+
+      if (!patientId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Patient ID is required'
+        });
+      }
+
+      if (!content) {
+        return res.status(400).json({
+          success: false,
+          message: 'Note content is required'
+        });
+      }
+
+      // Get author from request body first, fallback to user object
+      const author = bodyAuthor || req.user?.fullName || `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || 'Agent';
+      const authorEmail = req.user?.email;
+
+      const communication = await callHistoryService.createPatientNote({
+        patientId,
+        patientName,
+        content,
+        author,
+        authorEmail,
+        noteType
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Note created',
+        data: {
+          id: communication._id,
+          communicationId: communication.callMetadata.callId,
+          type: noteType,
+          content,
+          author,
+          timestamp: communication.sent
+        }
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error creating patient note:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error creating note',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get all communications for a patient (calls + notes + device activity)
+   * GET /call-history/patient/:patientId/communications
+   */
+  async getPatientCommunications(req, res) {
+    try {
+      const { patientId } = req.params;
+      const { limit = 100, skip = 0, types } = req.query;
+
+      if (!patientId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Patient ID is required'
+        });
+      }
+
+      // Parse types if provided as comma-separated string
+      const typeArray = types ? types.split(',').map(t => t.trim()) : undefined;
+
+      const result = await callHistoryService.getPatientCommunications(patientId, {
+        limit: parseInt(limit),
+        skip: parseInt(skip),
+        types: typeArray
+      });
+
+      res.status(200).json({
+        success: true,
+        total: result.total,
+        data: result.items
+      });
+    } catch (error) {
+      console.error('[CallHistory] Error fetching patient communications:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching communications',
+        error: error.message
       });
     }
   }
