@@ -9,6 +9,7 @@ class PatientController {
     this.deletePatient = this.deletePatient.bind(this);
     this.getPatientByEmail = this.getPatientByEmail.bind(this);
     this.lookupPatient = this.lookupPatient.bind(this);
+    this.searchPatients = this.searchPatients.bind(this);
   }
 
   async createPatient(req, res) {
@@ -64,6 +65,93 @@ class PatientController {
       res.json(patient);
     } catch (error) {
       res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * Search patients by multiple criteria
+   * GET /patient/search?name={name}&phone={phone}&nhsNumber={nhs}&postcode={postcode}
+   * All parameters are optional, returns patients matching ALL provided criteria
+   */
+  async searchPatients(req, res) {
+    try {
+      const { name, phone, nhsNumber, postcode } = req.query;
+
+      if (!name && !phone && !nhsNumber && !postcode) {
+        return res.status(400).json({
+          success: false,
+          error: "At least one search parameter is required (name, phone, nhsNumber, or postcode)"
+        });
+      }
+
+      const query = { $and: [] };
+
+      // Name search (partial match on given or family name)
+      if (name) {
+        const nameRegex = new RegExp(name, 'i');
+        query.$and.push({
+          $or: [
+            { 'name.given': { $elemMatch: { $regex: nameRegex } } },
+            { 'name.family': { $regex: nameRegex } }
+          ]
+        });
+      }
+
+      // Phone search with UK number normalization
+      if (phone) {
+        const phoneVariants = [phone];
+        const cleanPhone = phone.replace(/\s+/g, '');
+
+        if (cleanPhone.startsWith('+44')) {
+          phoneVariants.push('0' + cleanPhone.slice(3));
+        } else if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+          phoneVariants.push('+44' + cleanPhone.slice(1));
+        }
+
+        query.$and.push({
+          telecom: {
+            $elemMatch: {
+              system: 'phone',
+              value: { $in: phoneVariants }
+            }
+          }
+        });
+      }
+
+      // NHS Number search (stored in identifier array)
+      if (nhsNumber) {
+        const cleanNhs = nhsNumber.replace(/\s+/g, '');
+        query.$and.push({
+          $or: [
+            { 'identifier.value': cleanNhs },
+            { 'identifier.value': nhsNumber }
+          ]
+        });
+      }
+
+      // Postcode search (partial match)
+      if (postcode) {
+        const postcodeRegex = new RegExp(postcode.replace(/\s+/g, '\\s*'), 'i');
+        query.$and.push({
+          'address.postalCode': { $regex: postcodeRegex }
+        });
+      }
+
+      // If no criteria added, return empty (shouldn't happen due to check above)
+      if (query.$and.length === 0) {
+        return res.json({ success: true, data: [], total: 0 });
+      }
+
+      const patients = await Patient.find(query).limit(50);
+
+      res.json({
+        success: true,
+        data: patients,
+        total: patients.length
+      });
+    } catch (error) {
+      console.error("Error in searchPatients:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 

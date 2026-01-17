@@ -4,6 +4,12 @@ import { v4 as uuidv4 } from 'uuid';
 const patientSchema = new mongoose.Schema({
   resourceType: { type: String, default: "Patient" },
   id: { type: String, unique: true, default: () => uuidv4() },
+  identifier: [
+    {
+      system: String, // e.g., "https://fhir.nhs.uk/Id/nhs-number"
+      value: String   // e.g., "485 777 3456"
+    }
+  ],
   name: [
     {
       use: { type: String, enum: ["usual", "official", "temp", "nickname", "anonymous", "old", "maiden"] },
@@ -40,6 +46,13 @@ const patientSchema = new mongoose.Schema({
 
 // Index for organization-scoped queries
 patientSchema.index({ 'managingOrganization.reference': 1, active: 1 });
+
+// Index for identifier (NHS number) searches
+patientSchema.index({ 'identifier.value': 1 });
+
+// Index for name searches
+patientSchema.index({ 'name.family': 1 });
+patientSchema.index({ 'name.given': 1 });
 
 const Patient = mongoose.model('Patient', patientSchema, 'Patient');
 export default Patient;

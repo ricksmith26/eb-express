@@ -19,6 +19,9 @@ class PatientRoutes {
     // this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
     this.router.get("/email", verifyAccessToken, this.controller.getPatientByEmail);
 
+    // Patient search by multiple criteria (for call center)
+    this.router.get("/search", this.controller.searchPatients);
+
     // Patient lookup by phone or email (for call center)
     this.router.get("/lookup", this.controller.lookupPatient);
 
