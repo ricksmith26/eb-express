@@ -7,11 +7,10 @@
  * - Pi devices register with the patient's email in the users map
  *
  * Flow:
- * 1. Agent clicks "Request Camera" → emits activateVideoFeed with patientEmail → Pi receives
- * 2. Pi creates WebRTC offer → emits videoFeedOffer with agentEmail → Agent receives
- * 3. Agent creates answer → emits videoFeedAnswer with patientEmail → Pi receives
- * 4. Both exchange ICE candidates via videoFeedIceCandidate
- * 5. Either side can emit videoFeedDisconnected to end video
+ * 1. Agent clicks "Request Camera" → creates WebRTC offer → emits activateVideoFeed with patientEmail + offer → Pi receives
+ * 2. Pi automatically accepts → creates answer → emits videoFeedAnswer with agentEmail → Agent receives
+ * 3. Both exchange ICE candidates via videoFeedIceCandidate
+ * 4. Either side can emit videoFeedDisconnected to end video
  */
 
 import { getPreferredSocketId, getUserEmail, Agents } from '../socketIo.js';
@@ -50,18 +49,26 @@ const getEmailBySocketId = (socketId) => {
 /**
  * Activate Video Feed - Agent → Pi
  * Sent when agent clicks "Request Camera Access" button
+ * Agent creates WebRTC offer and sends it with this event
  * Routes to Pi using patient's email (Pi registers with patient email in users map)
  */
 export const activateVideoFeed = (socket, users, io) => {
   socket.on('activateVideoFeed', (data) => {
-    const { patientEmail, callId } = data || {};
+    const { patientEmail, callId, offer } = data || {};
     const agentEmail = getEmailBySocketId(socket.id);
 
     console.log(`[VideoFeed] Activate request from ${agentEmail} to patient ${patientEmail}`);
+    console.log(`[VideoFeed] Offer included: ${!!offer}`);
 
     if (!patientEmail) {
       console.log('[VideoFeed] Missing patientEmail in activateVideoFeed');
       socket.emit('videoFeedError', { error: 'Patient email required' });
+      return;
+    }
+
+    if (!offer) {
+      console.log('[VideoFeed] Missing offer in activateVideoFeed');
+      socket.emit('videoFeedError', { error: 'WebRTC offer required' });
       return;
     }
 
@@ -73,14 +80,15 @@ export const activateVideoFeed = (socket, users, io) => {
       return;
     }
 
-    // Relay to device (Pi)
+    // Relay to device (Pi) with offer
     io.to(deviceSocketId).emit('activateVideoFeed', {
       callId,
       agentEmail,
-      agentSocketId: socket.id
+      agentSocketId: socket.id,
+      offer
     });
 
-    console.log(`[VideoFeed] Sent activateVideoFeed to device for patient ${patientEmail}`);
+    console.log(`[VideoFeed] Sent activateVideoFeed with offer to device for patient ${patientEmail}`);
   });
 };
 
@@ -122,36 +130,52 @@ export const videoFeedOffer = (socket, users, io) => {
 };
 
 /**
- * Video Feed Answer - Agent → Pi
- * Agent sends WebRTC answer in response to offer
- * Routes to Pi using patient's email
+ * Video Feed Answer - Bi-directional
+ * Now primarily used for Pi → Agent (Pi receives offer, sends answer back)
+ * Also supports legacy Agent → Pi flow
  */
 export const videoFeedAnswer = (socket, users, io) => {
   socket.on('videoFeedAnswer', (data) => {
-    const { callId, patientEmail, answer } = data || {};
-    const agentEmail = getEmailBySocketId(socket.id);
+    const { callId, patientEmail, agentEmail, answer } = data || {};
 
-    console.log(`[VideoFeed] Answer from ${agentEmail} to patient ${patientEmail}`);
+    // Pi sends answer to agent (new flow: agent offers, Pi answers)
+    if (agentEmail) {
+      console.log(`[VideoFeed] Answer from Pi to agent ${agentEmail}`);
 
-    if (!patientEmail) {
-      console.log('[VideoFeed] Missing patientEmail in videoFeedAnswer');
+      const agentSocketId = getAgentSocketId(agentEmail);
+      if (!agentSocketId) {
+        console.log(`[VideoFeed] Agent ${agentEmail} is not connected`);
+        return;
+      }
+
+      // Relay answer to agent
+      io.to(agentSocketId).emit('videoFeedAnswer', {
+        callId,
+        answer
+      });
+
+      console.log(`[VideoFeed] Relayed answer to agent ${agentEmail}`);
       return;
     }
 
-    // Pi registers with patient's email in the users map
-    const deviceSocketId = getPreferredSocketId(patientEmail);
-    if (!deviceSocketId) {
-      console.log(`[VideoFeed] No device connected for patient ${patientEmail}`);
-      return;
+    // Legacy: Agent sends answer to Pi
+    if (patientEmail) {
+      const senderEmail = getEmailBySocketId(socket.id);
+      console.log(`[VideoFeed] Answer from ${senderEmail} to patient ${patientEmail}`);
+
+      const deviceSocketId = getPreferredSocketId(patientEmail);
+      if (!deviceSocketId) {
+        console.log(`[VideoFeed] No device connected for patient ${patientEmail}`);
+        return;
+      }
+
+      io.to(deviceSocketId).emit('videoFeedAnswer', {
+        callId,
+        answer
+      });
+
+      console.log(`[VideoFeed] Relayed answer to device for patient ${patientEmail}`);
     }
-
-    // Relay answer to device (Pi)
-    io.to(deviceSocketId).emit('videoFeedAnswer', {
-      callId,
-      answer
-    });
-
-    console.log(`[VideoFeed] Relayed answer to device for patient ${patientEmail}`);
   });
 };
 
