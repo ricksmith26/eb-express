@@ -16,6 +16,13 @@ import registerPushToken from './events/registerPushToken.js'
 import declineCall from './events/declineCall.js'
 import cancelCall from './events/cancelCall.js'
 import registerDevice from './events/registerDevice.js'
+import {
+  activateVideoFeed,
+  videoFeedOffer,
+  videoFeedAnswer,
+  videoFeedIceCandidate,
+  videoFeedDisconnected
+} from './events/videoFeed.js'
 
 // Change from Map<email, socketId> to Map<email, Array<{socketId, deviceType}>>
 export const users = new Map();
@@ -180,5 +187,12 @@ export const socketInit = (io) => {
 
       // Device registration (IoT devices like Brigid Pi)
       registerDevice(io, socket)
+
+      // Video feed events for emergency calls
+      activateVideoFeed(socket, users, io)
+      videoFeedOffer(socket, users, io)
+      videoFeedAnswer(socket, users, io)
+      videoFeedIceCandidate(socket, users, io)
+      videoFeedDisconnected(socket, users, io)
     });
 }
