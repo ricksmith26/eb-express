@@ -24,6 +24,7 @@ import callHistoryRoutes from './routes/call-history-routes.js';
 import deviceRoutes from './routes/deviceRoutes.js';
 import auditEventRoutes from './routes/auditEventRoutes.js';
 import patientMediaRoutes from './routes/patient-media-routes.js';
+import recordingRoutes from './routes/recording-routes.js';
 import brigidCalendarRoutes from './routes/brigid-calendar-routes.js';
 import brigidCalendarService from './services/brigid-calendar-service.js';
 
@@ -75,7 +76,7 @@ app.set("trust proxy", 1); // ✅ Required for AWS Elastic Beanstalk & reverse p
 
 // CORS configuration - restrict to frontend URL for security
 const corsOptions = {
-  origin: [process.env.FRONTEND_URL, "http://localhost:5173", "https://main.d1027o4nsqa17p.amplifyapp.com"], // Use FRONTEND_URL if set, otherwise allow all (dev only)
+  origin: [process.env.FRONTEND_URL, "http://localhost:5173","http://localhost:5174", "https://main.d1027o4nsqa17p.amplifyapp.com"], // Use FRONTEND_URL if set, otherwise allow all (dev only)
   credentials: true, // Allow cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id']
@@ -158,6 +159,7 @@ app.use('/withings', withingsRoutes);
 app.use('/device', deviceRoutes);
 app.use('/auditEvent', auditEventRoutes);
 app.use('/api/patient-media', patientMediaRoutes);
+app.use('/api/recordings', recordingRoutes);
 app.use('/brigid-calendar', brigidCalendarRoutes);
 
 // Admin Portal Routes (Cognito Auth)
