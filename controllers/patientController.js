@@ -1,5 +1,8 @@
 import Patient from '../models/PatientSchema.js';
 import RelatedPerson from '../models/RelatedPerson.js';
+import AllergyIntolerance from '../models/FhirAllergyIntolerance.js';
+import Condition from '../models/FhirCondition.js';
+import MedicationStatement from '../models/FhirMedicationStatement.js';
 
 class PatientController {
   constructor() {
@@ -10,6 +13,8 @@ class PatientController {
     this.getPatientByEmail = this.getPatientByEmail.bind(this);
     this.lookupPatient = this.lookupPatient.bind(this);
     this.searchPatients = this.searchPatients.bind(this);
+    this.updateMedicalInfo = this.updateMedicalInfo.bind(this);
+    this.getClinicalSummary = this.getClinicalSummary.bind(this);
   }
 
   async createPatient(req, res) {
@@ -211,6 +216,112 @@ class PatientController {
     } catch (error) {
       console.error("Error in lookupPatient:", error);
       res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * Update medical information for a patient
+   * PATCH /patient/:id/medical-info
+   * Body: { bloodType, gpPractice, gpPhone, medications, allergies, conditions, nhsNumber }
+   */
+  async updateMedicalInfo(req, res) {
+    try {
+      const { id } = req.params;
+      const { bloodType, gpPractice, gpPhone, medications, allergies, conditions, nhsNumber } = req.body;
+
+      const patient = await Patient.findById(id);
+      if (!patient) {
+        return res.status(404).json({ success: false, error: "Patient not found" });
+      }
+
+      // Update medical info fields
+      if (!patient.medicalInfo) {
+        patient.medicalInfo = {};
+      }
+
+      if (bloodType !== undefined) patient.medicalInfo.bloodType = bloodType;
+      if (gpPractice !== undefined) patient.medicalInfo.gpPractice = gpPractice;
+      if (gpPhone !== undefined) patient.medicalInfo.gpPhone = gpPhone;
+      if (medications !== undefined) patient.medicalInfo.medications = medications;
+      if (allergies !== undefined) patient.medicalInfo.allergies = allergies;
+      if (conditions !== undefined) patient.medicalInfo.conditions = conditions;
+
+      // Update NHS number in identifier array
+      if (nhsNumber !== undefined) {
+        const nhsIdentifierIndex = patient.identifier?.findIndex(
+          id => id.system === 'https://fhir.nhs.uk/Id/nhs-number'
+        );
+
+        if (nhsIdentifierIndex >= 0) {
+          patient.identifier[nhsIdentifierIndex].value = nhsNumber;
+        } else {
+          if (!patient.identifier) patient.identifier = [];
+          patient.identifier.push({
+            system: 'https://fhir.nhs.uk/Id/nhs-number',
+            value: nhsNumber
+          });
+        }
+      }
+
+      await patient.save();
+
+      res.json({
+        success: true,
+        data: patient
+      });
+    } catch (error) {
+      console.error("Error in updateMedicalInfo:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Get clinical summary for a patient (bundled FHIR resources)
+   * GET /patient/:id/clinical-summary
+   * Returns { patient, allergies, conditions, medications, contacts }
+   */
+  async getClinicalSummary(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Fetch patient
+      const patient = await Patient.findById(id);
+      if (!patient) {
+        return res.status(404).json({ success: false, error: "Patient not found" });
+      }
+
+      // Build reference strings for queries
+      const patientRef = `Patient/${patient._id}`;
+
+      // Fetch all clinical resources in parallel
+      const [allergies, conditions, medications, contacts] = await Promise.all([
+        AllergyIntolerance.find({ "patient.reference": patientRef }).sort({ recordedDate: -1 }),
+        Condition.find({ "subject.reference": patientRef }).sort({ recordedDate: -1 }),
+        MedicationStatement.find({ "subject.reference": patientRef }).sort({ dateAsserted: -1 }),
+        RelatedPerson.find({ "patient.reference": patientRef }),
+      ]);
+
+      // Get NHS number from identifier
+      const nhsIdentifier = patient.identifier?.find(
+        id => id.system === 'https://fhir.nhs.uk/Id/nhs-number'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          patient,
+          nhsNumber: nhsIdentifier?.value || null,
+          allergies,
+          conditions,
+          medications,
+          contacts,
+          // Include legacy medicalInfo for backward compatibility
+          legacyMedicalInfo: patient.medicalInfo || null,
+        }
+      });
+    } catch (error) {
+      console.error("Error in getClinicalSummary:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 }

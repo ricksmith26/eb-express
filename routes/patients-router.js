@@ -29,7 +29,11 @@ class PatientRoutes {
     this.router.get("/", this.controller.getPatients);
     this.router.post("/", this.controller.createPatient);
     this.router.put("/:id", this.controller.updatePatient);
+    this.router.patch("/:id/medical-info", this.controller.updateMedicalInfo);
     this.router.delete("/:id", this.controller.deletePatient);
+
+    // Clinical summary endpoint (bundled FHIR resources)
+    this.router.get("/:id/clinical-summary", this.controller.getClinicalSummary);
   }
 
   getRouter() {
