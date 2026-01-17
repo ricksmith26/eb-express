@@ -69,8 +69,10 @@ class AsteriskController {
       if (!credential) return res.status(404).json({ message: 'No inactive customer found' });
 
       // Create customer object with email if provided (for patient lookup on agent side)
+      // Set type to 'sip' so frontend knows this is a SIP call (not phone)
       const customerData = {
         ...credential.toObject(),
+        type: 'sip',  // Override type for frontend to identify as SIP call
         callerEmail: email || null  // Store the caller's email for patient lookup
       };
 
