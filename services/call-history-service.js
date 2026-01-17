@@ -336,6 +336,24 @@ class CallHistoryService {
   }
 
   /**
+   * Lookup patient by email address
+   * @param {String} email - Email address to lookup
+   * @returns {Promise<Object|null>} Patient record or null
+   */
+  async _lookupPatientByEmail(email) {
+    if (!email) return null;
+
+    return await Patient.findOne({
+      telecom: {
+        $elemMatch: {
+          system: "email",
+          value: email
+        }
+      }
+    });
+  }
+
+  /**
    * Initialize a call record for Twilio/phone calls
    * Automatically looks up patient by phone number and links if found
    * @param {Object} callData - Call initialization data
@@ -344,6 +362,7 @@ class CallHistoryService {
   async initiateTwilioCall(callData) {
     const {
       callerPhone,
+      callerEmail,    // Caller email (for SIP/web calls)
       callerName,
       recipientPhone,
       recipientName,
@@ -357,11 +376,17 @@ class CallHistoryService {
 
     const callId = uuidv4();
 
-    // Determine customer phone (the external party)
+    // Determine customer phone/email (the external party)
     const customerPhone = direction === 'inbound' ? callerPhone : recipientPhone;
+    const customerEmail = direction === 'inbound' ? callerEmail : null;
 
-    // Try to lookup patient by phone number
-    const patient = await this._lookupPatientByPhone(customerPhone);
+    // Try to lookup patient by phone first, then by email
+    let patient = await this._lookupPatientByPhone(customerPhone);
+    console.log(`[CallHistory] Phone lookup for ${customerPhone}: ${patient ? patient._id : 'not found'}`);
+    if (!patient && customerEmail) {
+      patient = await this._lookupPatientByEmail(customerEmail);
+      console.log(`[CallHistory] Email lookup for ${customerEmail}: ${patient ? patient._id : 'not found'}`);
+    }
     const patientName = patient
       ? `${patient.name?.[0]?.given?.[0] || ''} ${patient.name?.[0]?.family || ''}`.trim()
       : null;
@@ -371,12 +396,15 @@ class CallHistoryService {
 
     if (direction === 'inbound') {
       // Inbound: Customer called us
+      // Use phone if available, otherwise email
+      const senderSystem = callerPhone ? 'phone' : 'email';
+      const senderValue = callerPhone || callerEmail;
       sender = {
         identifier: {
-          system: 'phone',
-          value: callerPhone
+          system: senderSystem,
+          value: senderValue
         },
-        display: patientName || callerName || callerPhone
+        display: patientName || callerName || senderValue
       };
       recipient = [{
         identifier: {

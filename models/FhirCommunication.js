@@ -158,7 +158,13 @@ const FhirCommunicationSchema = new Schema({
     isEmergency: {
       type: Boolean,
       default: false
-    }
+    },
+    direction: {
+      type: String,
+      enum: ['inbound', 'outbound']
+    },
+    asteriskChannel: String,
+    recordingKey: String
   }
 
 }, {

@@ -289,6 +289,7 @@ class CallHistoryController {
     try {
       const {
         callerPhone,
+        callerEmail,
         callerName,
         recipientPhone,
         recipientName,
@@ -300,15 +301,17 @@ class CallHistoryController {
         recordingKey
       } = req.body;
 
-      if (!callerPhone || !direction) {
+      // Require at least one of callerPhone or callerEmail
+      if ((!callerPhone && !callerEmail) || !direction) {
         return res.status(400).json({
           success: false,
-          message: 'callerPhone and direction are required'
+          message: 'callerPhone or callerEmail and direction are required'
         });
       }
 
       const result = await callHistoryService.initiateTwilioCall({
         callerPhone,
+        callerEmail,
         callerName,
         recipientPhone,
         recipientName,
