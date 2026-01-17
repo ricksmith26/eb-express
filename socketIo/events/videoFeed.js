@@ -92,7 +92,8 @@ export const videoFeedOffer = (socket, users, io) => {
   socket.on('videoFeedOffer', (data) => {
     const { callId, deviceId, offer, agentEmail } = data || {};
 
-    console.log(`[VideoFeed] Offer from device ${deviceId} to ${agentEmail}`);
+    console.log(`[VideoFeed] Offer received from device ${deviceId} to agent ${agentEmail}`);
+    console.log(`[VideoFeed] Offer data keys:`, Object.keys(data || {}));
 
     if (!agentEmail) {
       console.log('[VideoFeed] Missing agentEmail in videoFeedOffer');
@@ -100,8 +101,12 @@ export const videoFeedOffer = (socket, users, io) => {
     }
 
     const agentSocketId = getAgentSocketId(agentEmail);
+    console.log(`[VideoFeed] Agent socket lookup for ${agentEmail}: ${agentSocketId || 'NOT FOUND'}`);
+
     if (!agentSocketId) {
       console.log(`[VideoFeed] Agent ${agentEmail} is not connected`);
+      // Log Agents map contents for debugging
+      console.log(`[VideoFeed] Current Agents map:`, Array.from(Agents.entries()));
       return;
     }
 
