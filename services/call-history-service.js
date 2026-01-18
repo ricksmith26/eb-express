@@ -677,14 +677,22 @@ class CallHistoryService {
   async getPatientCommunications(patientId, filters = {}) {
     const { limit = 100, skip = 0, types } = filters;
 
-    // Build query to match various reference formats
+    // Build query to match patient as subject, sender, or recipient
     const patientRef = `Patient/${patientId}`;
     const query = {
       $or: [
+        // Patient as subject
         { 'subject.reference': patientRef },
         { 'subject.reference': patientId },
-        { 'subject.reference.reference': patientRef }, // In case of nested object
-        { 'subject.reference.reference': patientId }
+        { 'subject.identifier.value': patientId },
+        // Patient as sender
+        { 'sender.reference': patientRef },
+        { 'sender.reference': patientId },
+        { 'sender.identifier.value': patientId },
+        // Patient as recipient
+        { 'recipient.reference': patientRef },
+        { 'recipient.reference': patientId },
+        { 'recipient.identifier.value': patientId }
       ]
     };
 
