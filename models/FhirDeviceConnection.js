@@ -61,7 +61,10 @@ const FhirDeviceConnectionSchema = new mongoose.Schema({
   // Device reference - only for Pi devices
   device: {
     reference: String,  // 'Device/{id}'
-    deviceId: String
+    deviceId: String,
+    fingerprint: String,
+    macAddress: String,
+    hostname: String
   },
 
   // Current socket connection info

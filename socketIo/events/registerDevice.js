@@ -54,6 +54,7 @@ const registerDeviceEvent = (io, socket) => {
       }
 
       console.log(`📱 Device connecting: ${deviceId} (socket: ${socket.id})`);
+      console.log(`📱 Fingerprint received: ${fingerprint ? fingerprint.substring(0, 20) + '...' : 'NONE'}`);
 
       // Check if device is already connected (disconnect old socket)
       const existingConnection = connectedDevices.get(deviceId);
@@ -68,9 +69,12 @@ const registerDeviceEvent = (io, socket) => {
       // Find device in database
       let device = null;
       if (fingerprint) {
+        console.log(`📱 Looking up by fingerprint: ${fingerprint.substring(0, 20)}...`);
         device = await FhirDevice.findByFingerprint(fingerprint);
+        console.log(`📱 Fingerprint lookup result: ${device ? device.id : 'NOT FOUND'}`);
       } else {
         // Try to find by device_id prefix in fingerprint
+        console.log(`📱 No fingerprint, trying device_id prefix lookup`);
         device = await FhirDevice.findOne({
           'identifier.system': 'urn:brigid:device:fingerprint',
           'identifier.value': { $regex: `^${deviceId.toLowerCase()}`, $options: 'i' },
@@ -100,6 +104,9 @@ const registerDeviceEvent = (io, socket) => {
       try {
         const connection = await DeviceConnectionService.handleDeviceConnect(deviceId, device?.id, socket.id, {
           authenticated,
+          fingerprint: data?.fingerprint || fingerprint,
+          macAddress: data?.mac_address,
+          hostname: data?.hostname,
           deviceInfo: data?.device_info,
           ownerEmail: device?.owner?.email
         });

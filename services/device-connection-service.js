@@ -187,7 +187,10 @@ class DeviceConnectionService {
       }
 
       const deviceData = {
-        deviceId
+        deviceId,
+        fingerprint: metadata.fingerprint || null,
+        macAddress: metadata.macAddress || null,
+        hostname: metadata.hostname || null
       };
 
       if (resourceId) {
