@@ -43,14 +43,13 @@ import passport from "./config/passport.js";
 import MongoStore from "connect-mongo";
 import session from "express-session"
 import "./config/passport.js";
-import "./instrument.js";
-import * as Sentry from "@sentry/node";
 // import cookieSession from 'cookie-session'
 import dotenv from "dotenv";
 import {dotEnvConfig} from './config/vars.js'
 import expressListEndpoints from "express-list-endpoints";
 import {socketInit, users} from './socketIo/socketIo.js'
-import {setupAgenda}  from './agenda/agenda.js'
+import {setupAgenda}  from './agenda/agenda.js';
+import * as Sentry from "@sentry/node";
 dotenv.config(dotEnvConfig);
 
 // Validate required environment variables

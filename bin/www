@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Initialize Sentry before any other imports
+import '../instrument.js';
+
 /**
  * Module dependencies.
  */
