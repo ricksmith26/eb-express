@@ -5,6 +5,30 @@
 import express from 'express';
 import deviceConnectionController from '../controllers/device-connection-controller.js';
 import { verifyAccessToken } from '../middleware/auth.js';
+import { verifyCognitoToken } from '../middleware/cognitoAuth.js';
+
+/**
+ * Combined auth middleware - accepts either Cognito (admin) or regular user JWT
+ */
+const verifyAnyToken = async (req, res, next) => {
+  // Try Cognito auth first (for admin portal)
+  verifyCognitoToken(req, res, (cognitoErr) => {
+    if (!cognitoErr && req.practitioner) {
+      // Cognito auth succeeded
+      return next();
+    }
+
+    // Fall back to regular user auth
+    verifyAccessToken(req, res, (userErr) => {
+      if (!userErr) {
+        return next();
+      }
+
+      // Both failed
+      return res.status(401).json({ error: 'Unauthorized' });
+    });
+  });
+};
 
 class DeviceConnectionRoutes {
   constructor() {
@@ -13,8 +37,8 @@ class DeviceConnectionRoutes {
   }
 
   initializeRoutes() {
-    // All routes require authentication
-    this.router.use(verifyAccessToken);
+    // All routes require authentication (Cognito or regular JWT)
+    this.router.use(verifyAnyToken);
 
     // GET /device-connections - List all device connections
     this.router.get('/', deviceConnectionController.list);
