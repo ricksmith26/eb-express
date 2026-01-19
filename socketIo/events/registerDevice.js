@@ -3,6 +3,7 @@
  * Handles device connections and registration via WebSocket
  */
 import FhirDevice from '../../models/FhirDevice.js';
+import DeviceConnectionService from '../../services/device-connection-service.js';
 
 // Track connected devices: Map<deviceId, { socketId, connectedAt, deviceInfo }>
 const connectedDevices = new Map();
@@ -94,6 +95,20 @@ const registerDeviceEvent = (io, socket) => {
         deviceInfo: data?.device_info || {},
         resourceId: device?.id || null
       });
+
+      // Persist Pi device connection to database
+      try {
+        const connection = await DeviceConnectionService.handleDeviceConnect(deviceId, device?.id, socket.id, {
+          authenticated,
+          deviceInfo: data?.device_info,
+          ownerEmail: device?.owner?.email
+        });
+
+        // Broadcast to status monitor (in addition to device-monitor)
+        DeviceConnectionService.broadcastStatusChange(io, connection, 'online');
+      } catch (error) {
+        console.error('Error persisting Pi device connection:', error);
+      }
 
       // Join device-specific room
       socket.join(`device:${deviceId}`);

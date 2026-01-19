@@ -1,10 +1,21 @@
 import { AsteriskCredential } from '../../models/Asterisk.js';
 import { io } from '../../app.js';
 import QueueController from '../../controllers/queue-controller.js'
+import DeviceConnectionService from '../../services/device-connection-service.js';
 
 const disconnect = (socket, users, agents) => {
     console.log('DISCONNECTION<<<<<<<<', agents)
     socket.on('disconnect', async () => {
+        // Update database status for this socket
+        try {
+            const connection = await DeviceConnectionService.handleDisconnect(socket.id);
+            if (connection) {
+                DeviceConnectionService.broadcastStatusChange(io, connection, 'offline');
+            }
+        } catch (error) {
+            console.error('Error updating disconnect status:', error);
+        }
+
         // Handle multi-connection user disconnection
         for (const [email, connections] of users.entries()) {
             if (Array.isArray(connections)) {

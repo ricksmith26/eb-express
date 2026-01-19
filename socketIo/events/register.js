@@ -1,11 +1,12 @@
 import { getPendingCall, removePendingCall, getPreferredSocketId } from '../socketIo.js';
+import DeviceConnectionService from '../../services/device-connection-service.js';
 
 /**
  * Register a user's socket connection with optional device type
  * Supports both legacy format (email only) and new format ({email, deviceType})
  */
 const register = (socket, users, io) => {
-    socket.on('register', (data) => {
+    socket.on('register', async (data) => {
         let email, deviceType;
 
         // Support both old format (string email) and new format ({email, deviceType})
@@ -64,9 +65,20 @@ const register = (socket, users, io) => {
 
         users.set(email, connections);
 
+        // Persist connection to database (looks up Patient by email)
+        try {
+            const connection = await DeviceConnectionService.handlePatientConnect(email, deviceType, socket.id, {
+                connectedAt: new Date()
+            });
+
+            // Broadcast status change to monitors
+            DeviceConnectionService.broadcastStatusChange(io, connection, 'online');
+        } catch (error) {
+            console.error('Error persisting patient connection:', error);
+        }
+
         // Log all connections for this user
         console.log(`Total connections for ${email}:`, connections.length);
-        console.log(users)
         connections.forEach(conn => {
             console.log(`  - ${conn.socketId} (${conn.deviceType})`);
         });

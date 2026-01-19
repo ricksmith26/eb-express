@@ -23,6 +23,7 @@ import {
   videoFeedIceCandidate,
   videoFeedDisconnected
 } from './events/videoFeed.js'
+import DeviceConnectionService from '../services/device-connection-service.js'
 
 // Change from Map<email, socketId> to Map<email, Array<{socketId, deviceType}>>
 export const users = new Map();
@@ -183,7 +184,7 @@ export const socketInit = (io) => {
 
       // agentStatusChange(socket, Agents, agent, stat)
 
-      registerAgent(socket, Agents)
+      registerAgent(socket, Agents, io)
 
       // Device registration (IoT devices like Brigid Pi)
       registerDevice(io, socket)
@@ -194,5 +195,17 @@ export const socketInit = (io) => {
       videoFeedAnswer(socket, users, io)
       videoFeedIceCandidate(socket, users, io)
       videoFeedDisconnected(socket, users, io)
+
+      // Status monitoring room for real-time device status updates
+      socket.on('joinStatusMonitor', async () => {
+        socket.join('status-monitor');
+        try {
+          const onlineDevices = await DeviceConnectionService.getOnlineDevices();
+          socket.emit('statusMonitorJoined', { devices: onlineDevices });
+        } catch (error) {
+          console.error('Error joining status monitor:', error);
+          socket.emit('statusMonitorJoined', { devices: [], error: 'Failed to fetch devices' });
+        }
+      });
     });
 }

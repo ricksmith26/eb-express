@@ -28,6 +28,7 @@ import recordingRoutes from './routes/recording-routes.js';
 import brigidCalendarRoutes from './routes/brigid-calendar-routes.js';
 import brigidCalendarService from './services/brigid-calendar-service.js';
 import clinicalResourceRoutes from './routes/clinicalResourceRoutes.js';
+import deviceConnectionRoutes from './routes/deviceConnectionRoutes.js';
 
 // Admin Portal Routes
 import adminAuthRoutes from './routes/adminAuthRoutes.js';
@@ -163,6 +164,7 @@ app.use('/api/patient-media', patientMediaRoutes);
 app.use('/api/recordings', recordingRoutes);
 app.use('/brigid-calendar', brigidCalendarRoutes);
 app.use('/clinical', clinicalResourceRoutes);
+app.use('/device-connections', deviceConnectionRoutes);
 
 // Admin Portal Routes (Cognito Auth)
 app.use('/admin/auth', adminAuthRoutes);
