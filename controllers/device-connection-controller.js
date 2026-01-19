@@ -6,6 +6,29 @@ import DeviceConnectionService from '../services/device-connection-service.js';
 import FhirDeviceConnection from '../models/FhirDeviceConnection.js';
 import FhirConnectionEvent from '../models/FhirConnectionEvent.js';
 
+/**
+ * Transform a connection document to include displayIdentifier
+ */
+const transformConnection = (conn) => {
+  const doc = conn.toObject ? conn.toObject() : conn;
+  const deviceTypeCode = doc.deviceType?.coding?.[0]?.code;
+
+  // Compute displayIdentifier based on device type
+  let displayIdentifier = null;
+  if (deviceTypeCode === 'brigid-pi') {
+    displayIdentifier = doc.device?.deviceId || null;
+  } else {
+    displayIdentifier = doc.subject?.email || doc.subject?.username || null;
+  }
+
+  return {
+    ...doc,
+    displayIdentifier,
+    // Ensure lastUpdated is set for frontend compatibility
+    lastUpdated: doc.lastOnlineAt || doc.lastOfflineAt || doc.updatedAt || doc.createdAt
+  };
+};
+
 class DeviceConnectionController {
 
   /**
@@ -35,7 +58,7 @@ class DeviceConnectionController {
         resourceType: 'Bundle',
         type: 'searchset',
         total,
-        entry: connections.map(c => ({ resource: c }))
+        entry: connections.map(c => ({ resource: transformConnection(c) }))
       });
     } catch (error) {
       console.error('Error listing device connections:', error);
@@ -62,7 +85,7 @@ class DeviceConnectionController {
         resourceType: 'Bundle',
         type: 'searchset',
         total: devices.length,
-        entry: devices.slice(0, parseInt(limit)).map(d => ({ resource: d }))
+        entry: devices.slice(0, parseInt(limit)).map(d => ({ resource: transformConnection(d) }))
       });
     } catch (error) {
       console.error('Error listing online devices:', error);
@@ -106,7 +129,7 @@ class DeviceConnectionController {
         resourceType: 'Bundle',
         type: 'searchset',
         total: connections.length,
-        entry: connections.map(c => ({ resource: c }))
+        entry: connections.map(c => ({ resource: transformConnection(c) }))
       });
     } catch (error) {
       console.error('Error getting user connections:', error);
@@ -131,7 +154,7 @@ class DeviceConnectionController {
         return res.status(404).json({ error: 'Agent connection not found' });
       }
 
-      res.json(connection);
+      res.json(transformConnection(connection));
     } catch (error) {
       console.error('Error getting agent connection:', error);
       res.status(500).json({ error: 'Failed to get agent connection' });
@@ -220,7 +243,7 @@ class DeviceConnectionController {
         return res.status(404).json({ error: 'Connection not found' });
       }
 
-      res.json(connection);
+      res.json(transformConnection(connection));
     } catch (error) {
       console.error('Error getting connection:', error);
       res.status(500).json({ error: 'Failed to get connection' });

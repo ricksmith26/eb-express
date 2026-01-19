@@ -26,9 +26,16 @@ class DeviceConnectionService {
   /**
    * Handle patient connection (from register event)
    * Looks up Patient by email and upserts connection record
+   * NOTE: Pi devices should use handleDeviceConnect, not this method
    */
   static async handlePatientConnect(email, deviceType, socketId, metadata = {}) {
     try {
+      // Pi devices should not use this method - they should use handleDeviceConnect
+      if (deviceType === 'brigid-pi') {
+        console.warn(`⚠️ Pi device attempted to register via patient connect (email: ${email}). Ignoring.`);
+        return null;
+      }
+
       // Look up patient by email in telecom
       const patient = await Patient.findOne({
         'telecom.system': 'email',
@@ -343,7 +350,14 @@ class DeviceConnectionService {
    * Broadcast status change to monitoring room
    */
   static broadcastStatusChange(io, connection, status) {
-    if (!io) return;
+    if (!io) {
+      console.warn('⚠️ broadcastStatusChange: io is null');
+      return;
+    }
+    if (!connection) {
+      console.warn('⚠️ broadcastStatusChange: connection is null');
+      return;
+    }
 
     const payload = {
       connectionId: connection.id,
@@ -355,6 +369,7 @@ class DeviceConnectionService {
       timestamp: new Date().toISOString()
     };
 
+    console.log(`📡 Broadcasting ${status} to status-monitor:`, payload);
     io.to('status-monitor').emit('device_status_change', payload);
   }
 }

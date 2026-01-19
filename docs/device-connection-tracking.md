@@ -227,6 +227,10 @@ interface DeviceConnection {
   };
   lastOnlineAt: Date;
   lastOfflineAt: Date;
+
+  // Computed fields (added by API):
+  displayIdentifier: string;  // Pi: device.deviceId, Others: subject.email
+  lastUpdated: Date;          // Best available timestamp for "last updated"
 }
 ```
 

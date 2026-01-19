@@ -66,13 +66,16 @@ const register = (socket, users, io) => {
         users.set(email, connections);
 
         // Persist connection to database (looks up Patient by email)
+        // Note: Pi devices are rejected here and should use registerDevice event
         try {
             const connection = await DeviceConnectionService.handlePatientConnect(email, deviceType, socket.id, {
                 connectedAt: new Date()
             });
 
-            // Broadcast status change to monitors
-            DeviceConnectionService.broadcastStatusChange(io, connection, 'online');
+            // Broadcast status change to monitors (only if connection was created)
+            if (connection) {
+                DeviceConnectionService.broadcastStatusChange(io, connection, 'online');
+            }
         } catch (error) {
             console.error('Error persisting patient connection:', error);
         }
