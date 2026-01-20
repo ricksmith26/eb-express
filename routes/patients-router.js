@@ -28,6 +28,7 @@ class PatientRoutes {
     // Public/admin routes (you may want to add auth here too)
     this.router.get("/", this.controller.getPatients);
     this.router.post("/", this.controller.createPatient);
+    this.router.get("/:id", this.controller.getPatientById);
     this.router.put("/:id", this.controller.updatePatient);
     this.router.patch("/:id/medical-info", this.controller.updateMedicalInfo);
     this.router.delete("/:id", this.controller.deletePatient);

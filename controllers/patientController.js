@@ -8,6 +8,7 @@ class PatientController {
   constructor() {
     this.createPatient = this.createPatient.bind(this);
     this.getPatients = this.getPatients.bind(this);
+    this.getPatientById = this.getPatientById.bind(this);
     this.updatePatient = this.updatePatient.bind(this);
     this.deletePatient = this.deletePatient.bind(this);
     this.getPatientByEmail = this.getPatientByEmail.bind(this);
@@ -30,6 +31,18 @@ class PatientController {
   async getPatients(req, res) {
     const patients = await Patient.find();
     res.json(patients);
+  }
+
+  async getPatientById(req, res) {
+    try {
+      const patient = await Patient.findById(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      res.json(patient);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
 
   async updatePatient(req, res) {
@@ -175,10 +188,10 @@ class PatientController {
    */
   async lookupPatient(req, res) {
     try {
-      const { phone, email } = req.query;
+      const { phone, email, patientId } = req.query;
 
-      if (!phone && !email) {
-        return res.status(400).json({ error: "Either phone or email query parameter is required" });
+      if (!phone && !email && !patientId) {
+        return res.status(400).json({ error: "Either phone, email, or patientId query parameter is required" });
       }
 
       let patient;
@@ -205,6 +218,10 @@ class PatientController {
             }
           }
         });
+      } 
+      if (patientId) {
+        // Lookup by patient ID
+        patient = await Patient.findById(patientId);
       } else if (email) {
         // Lookup by email
         patient = await Patient.findOne({
