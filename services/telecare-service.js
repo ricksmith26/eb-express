@@ -246,6 +246,35 @@ class TelecareService {
         return result.rows[0] || null;
     }
 
+    /**
+     * Get device with full user/patient information for incoming calls.
+     * Used by queue controller to enrich emergencyCallConnection events.
+     */
+    async getDeviceWithPatientInfo(deviceId) {
+        const result = await pool.query(`
+            SELECT
+                td.device_id,
+                td.user_name,
+                td.user_address,
+                td.user_phone,
+                td.emergency_contact_name,
+                td.emergency_contact_phone,
+                td.emergency_contact_relationship,
+                td.secondary_contact_name,
+                td.secondary_contact_phone,
+                td.gp_name,
+                td.gp_phone,
+                td.device_type,
+                td.device_model,
+                td.patient_id,
+                td.fhir_device_id,
+                td.is_active
+            FROM telecare_devices td
+            WHERE td.device_id = $1 AND td.is_active = true
+        `, [deviceId]);
+        return result.rows[0] || null;
+    }
+
     async regeneratePassword(deviceId) {
         const newPassword = this.generateSecurePassword();
         await pool.query(`

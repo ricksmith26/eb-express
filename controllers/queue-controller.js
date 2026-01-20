@@ -3,6 +3,7 @@
 import { io } from '../app.js';
 // import { users } from '../socketIo/socketIo.js';
 import asteriskAMI from '../services/asterisk-ami-service.js';
+import telecareService from '../services/telecare-service.js';
 
 const LOG_PREFIX = '[QueueController]';
 
@@ -39,7 +40,7 @@ export class QueueController {
 
             if (this.agentQueue.length > 0) {
                 console.log(`${LOG_PREFIX} [addCustomerToQueue] Agent available - initiating pairing`);
-                const data = this.pairCustomerAndAgent()
+                const data = await this.pairCustomerAndAgent()
                 console.log(`${LOG_PREFIX} [addCustomerToQueue] Emitting emergencyCallConnection event:`, JSON.stringify(data));
                 io.emit('emergencyCallConnection', data)
                 console.log(`${LOG_PREFIX} [addCustomerToQueue] SUCCESS - paired customer with agent`);
@@ -64,7 +65,7 @@ export class QueueController {
 
             if (this.customerQueue.length > 0) {
                 console.log(`${LOG_PREFIX} [addAgentToQueue] Customer waiting - initiating pairing`);
-                const data = this.pairCustomerAndAgent()
+                const data = await this.pairCustomerAndAgent()
                 console.log(`${LOG_PREFIX} [addAgentToQueue] Emitting emergencyCallConnection event:`, JSON.stringify(data));
                 io.emit('emergencyCallConnection', data)
                 console.log(`${LOG_PREFIX} [addAgentToQueue] SUCCESS - paired agent with customer`);
@@ -101,7 +102,7 @@ export class QueueController {
         this.logQueueState('removeAgentFromQueue');
     }
 
-    pairCustomerAndAgent() {
+    async pairCustomerAndAgent() {
         console.log(`${LOG_PREFIX} [pairCustomerAndAgent] START - pairing customer and agent`);
         const customerData = this.takeFirst(this.customerQueue);
         const agentData = this.takeFirst(this.agentQueue);
@@ -124,6 +125,31 @@ export class QueueController {
             asteriskAMI.addAgentToAsteriskQueue(agentInterface, 'inbound-queue')
                 .then(() => console.log(`${LOG_PREFIX} Agent ${agentInterface} added to Asterisk queue`))
                 .catch(err => console.error(`${LOG_PREFIX} Failed to add agent to Asterisk queue:`, err));
+
+            // For telecare devices, lookup patient ID for FHIR Patient lookup
+            // Telecare device IDs start with 'TC-' (e.g., TC-PI-TEST-001)
+            const callerId = pairing.customer?.callerIdNum;
+            if (callerId && callerId.startsWith('TC-')) {
+                console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Telecare device detected: ${callerId}`);
+                try {
+                    const deviceInfo = await telecareService.getDeviceWithPatientInfo(callerId);
+                    if (deviceInfo) {
+                        console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Found telecare device:`, JSON.stringify({
+                            deviceId: deviceInfo.device_id,
+                            patientId: deviceInfo.patient_id
+                        }));
+                        // Only send deviceId and patientId - patient info loaded via FHIR API
+                        pairing.customer.telecareDevice = {
+                            deviceId: deviceInfo.device_id,
+                            patientId: deviceInfo.patient_id,
+                        };
+                    } else {
+                        console.log(`${LOG_PREFIX} [pairCustomerAndAgent] No telecare device info found for: ${callerId}`);
+                    }
+                } catch (err) {
+                    console.error(`${LOG_PREFIX} [pairCustomerAndAgent] Error fetching telecare device info:`, err);
+                }
+            }
         }
 
         return pairing;
