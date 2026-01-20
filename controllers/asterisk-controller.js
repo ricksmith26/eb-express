@@ -2,17 +2,6 @@ import { AsteriskCredential } from '../models/Asterisk.js';
 import { Agents } from '../socketIo/socketIo.js';
 import { io } from '../app.js'
 import QueueController from './queue-controller.js';
-const updateStatus = async (id, status) => {
-  const agent = await AsteriskCredential.findById(id);
-
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
-
-  agent.status = status;
-  await agent.save();
-
-}
 
 class AsteriskController {
   constructor() {
@@ -124,9 +113,11 @@ class AsteriskController {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      this.updateAgentStatus(id, status)
-    } catch (error){
-      updateAgentStatus
+      const result = await this.updateAgentStatus(id, status);
+      res.json(result);
+    } catch (error) {
+      console.error('setAgentStatus error:', error);
+      res.status(500).json({ error: error.message || 'Failed to update agent status' });
     }
   }
 
@@ -134,22 +125,22 @@ class AsteriskController {
     try {
       const agent = await AsteriskCredential.findById(id);
       if (!agent) {
-        return res.status(404).json({ error: 'Agent not found' });
+        throw new Error('Agent not found');
       }
       agent.status = status;
       await agent.save();
-      console.log('UPDATING STATUS: ',status)
+      console.log('UPDATING STATUS:', status);
       if (status === 'AVAILABLE') {
-        console.log('PUSHING TO QUEUE', status)
-        this.queueController.addAgentToQueue(agent)
+        console.log('PUSHING TO QUEUE', status);
+        this.queueController.addAgentToQueue(agent);
       } else {
-        this.queueController.removeAgentFromQueue(agent.username)
+        this.queueController.removeAgentFromQueue(agent.username);
       }
       io.emit('agentStatusChange', { username: agent.username, status });
-      return ({ message: `Agent set to ${status}` });
+      return { message: `Agent set to ${status}`, agent };
     } catch (error) {
-      console.error(error);
-      throw({ error: 'Failed to update agent status' });
+      console.error('updateAgentStatus error:', error);
+      throw error;
     }
   }
 }
