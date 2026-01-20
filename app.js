@@ -37,6 +37,10 @@ import adminPractitionerRoutes from './routes/adminPractitionerRoutes.js';
 import adminPatientRoutes from './routes/adminPatientRoutes.js';
 import adminDeviceRoutes from './routes/adminDeviceRoutes.js';
 import adminRoleRoutes from './routes/adminRoleRoutes.js';
+
+// Telecare (BS 8521-2) Routes
+import telecareRoutes from './routes/telecareRoutes.js';
+import { connectPostgres } from './config/postgres.js';
 import asteriskAMI from './services/asterisk-ami-service.js';
 import connectDB from './config/db.js';
 import passport from "./config/passport.js";
@@ -132,6 +136,14 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 connectDB();
+
+// Connect to PostgreSQL (for telecare/PJSIP realtime)
+connectPostgres().then(connected => {
+  if (connected) {
+    console.log('🐘 PostgreSQL ready for telecare operations');
+  }
+});
+
 app.use("/auth", authRoutes);
 app.use('/patients', patientsRouter);
 app.use('/patient', patientsRouter);  // Also support singular
@@ -172,6 +184,9 @@ app.use('/admin/practitioners', adminPractitionerRoutes);
 app.use('/admin/patients', adminPatientRoutes);
 app.use('/admin/devices', adminDeviceRoutes);
 app.use('/admin/roles', adminRoleRoutes);
+
+// Telecare Routes (BS 8521-2 device and alarm management)
+app.use('/telecare', telecareRoutes);
 
 // Inject Socket.IO into Brigid Calendar Service for real-time notifications
 brigidCalendarService.setSocketIO(io);
