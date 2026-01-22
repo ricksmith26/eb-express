@@ -401,6 +401,76 @@ class TelecareService {
     }
 
     // ==========================================
+    // Response Time Tracking
+    // ==========================================
+
+    /**
+     * Update a timestamp field for the most recent unacknowledged alarm.
+     * Used to track call_started_at and call_answered_at for compliance metrics.
+     */
+    async updateAlarmTimestamp(deviceId, field) {
+        const validFields = ['call_started_at', 'call_answered_at'];
+        if (!validFields.includes(field)) {
+            throw new Error(`Invalid field: ${field}`);
+        }
+
+        const result = await pool.query(`
+            UPDATE alarm_events
+            SET ${field} = NOW()
+            WHERE id = (
+                SELECT id FROM alarm_events
+                WHERE device_id = $1
+                  AND acknowledged_at IS NULL
+                  AND ${field} IS NULL
+                ORDER BY received_at DESC
+                LIMIT 1
+            )
+            RETURNING id, device_id, ${field}
+        `, [deviceId]);
+
+        return result.rows[0] || null;
+    }
+
+    /**
+     * Get response time metrics for compliance reporting.
+     * Returns average and percentile response times.
+     */
+    async getResponseTimeMetrics(startDate, endDate, organizationId = null) {
+        let query = `
+            SELECT
+                COUNT(*) as total_alarms,
+                COUNT(*) FILTER (WHERE call_answered_at IS NOT NULL) as answered_alarms,
+                AVG(EXTRACT(EPOCH FROM (call_answered_at - received_at)))
+                    FILTER (WHERE call_answered_at IS NOT NULL) as avg_response_seconds,
+                AVG(EXTRACT(EPOCH FROM (acknowledged_at - received_at)))
+                    FILTER (WHERE acknowledged_at IS NOT NULL) as avg_resolution_seconds,
+                PERCENTILE_CONT(0.95) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (call_answered_at - received_at))
+                ) FILTER (WHERE call_answered_at IS NOT NULL) as p95_response_seconds,
+                MIN(EXTRACT(EPOCH FROM (call_answered_at - received_at)))
+                    FILTER (WHERE call_answered_at IS NOT NULL) as min_response_seconds,
+                MAX(EXTRACT(EPOCH FROM (call_answered_at - received_at)))
+                    FILTER (WHERE call_answered_at IS NOT NULL) as max_response_seconds
+            FROM alarm_events
+            WHERE received_at BETWEEN $1 AND $2
+        `;
+        const params = [startDate, endDate];
+
+        const result = await pool.query(query, params);
+        const row = result.rows[0];
+
+        return {
+            totalAlarms: parseInt(row.total_alarms) || 0,
+            answeredAlarms: parseInt(row.answered_alarms) || 0,
+            avgResponseSeconds: parseFloat(row.avg_response_seconds) || null,
+            avgResolutionSeconds: parseFloat(row.avg_resolution_seconds) || null,
+            p95ResponseSeconds: parseFloat(row.p95_response_seconds) || null,
+            minResponseSeconds: parseFloat(row.min_response_seconds) || null,
+            maxResponseSeconds: parseFloat(row.max_response_seconds) || null
+        };
+    }
+
+    // ==========================================
     // Utilities
     // ==========================================
 

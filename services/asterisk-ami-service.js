@@ -1,5 +1,6 @@
 import AsteriskManager from 'asterisk-manager';
 import queueController from '../controllers/queue-controller.js';
+import telecareService from './telecare-service.js';
 
 const LOG_PREFIX = '[AsteriskAMI]';
 
@@ -57,6 +58,7 @@ class AsteriskAMIService {
         // Queue events - when an agent connects to caller
         this.ami.on('agentconnect', (event) => {
             console.log(`${LOG_PREFIX} [AgentConnect] Agent connected:`, JSON.stringify(event));
+            this.handleAgentConnect(event);
         });
 
         // Queue events - when call completes
@@ -99,6 +101,48 @@ class AsteriskAMIService {
             console.log(`${LOG_PREFIX} Customer added to queue controller:`, result);
         } catch (error) {
             console.error(`${LOG_PREFIX} Error adding customer to queue:`, error);
+        }
+    }
+
+    /**
+     * Handle when an agent connects to a caller - update call_answered_at for telecare alarms
+     */
+    async handleAgentConnect(event) {
+        // Note: asterisk-manager returns lowercase property names
+        // channel is the caller's channel (e.g., PJSIP/TC-TEST-001-00000001)
+        const { queue, channel, destchannel } = event;
+
+        // Check if this is a telecare device call (channel starts with PJSIP/TC-)
+        if (!channel || !channel.startsWith('PJSIP/TC-')) {
+            return; // Not a telecare call, ignore
+        }
+
+        // Extract device ID from channel name
+        // Format: PJSIP/TC-xxx-xxxxxxxx (8 hex digits at end are call counter)
+        const match = channel.match(/^PJSIP\/(TC-[^-]+-[^-]+)-/);
+        if (!match) {
+            // Try simpler format: PJSIP/TC-xxx-xxxxxxxx
+            const simpleMatch = channel.match(/^PJSIP\/(TC-[^-]+)-/);
+            if (!simpleMatch) {
+                console.log(`${LOG_PREFIX} Could not extract device ID from channel: ${channel}`);
+                return;
+            }
+            var deviceId = simpleMatch[1];
+        } else {
+            var deviceId = match[1];
+        }
+
+        console.log(`${LOG_PREFIX} Telecare call answered - Device: ${deviceId}, Agent: ${destchannel}`);
+
+        try {
+            const result = await telecareService.updateAlarmTimestamp(deviceId, 'call_answered_at');
+            if (result) {
+                console.log(`${LOG_PREFIX} Updated call_answered_at for alarm ${result.id} (device: ${deviceId})`);
+            } else {
+                console.log(`${LOG_PREFIX} No pending alarm found for device ${deviceId}`);
+            }
+        } catch (error) {
+            console.error(`${LOG_PREFIX} Error updating alarm timestamp:`, error);
         }
     }
 
