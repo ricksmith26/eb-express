@@ -356,6 +356,20 @@ class TelecareService {
         return result.rows;
     }
 
+    /**
+     * Get the most recent unacknowledged alarm for a device.
+     * Used to trigger escalation when a telecare call comes in.
+     */
+    async getMostRecentUnacknowledgedAlarm(deviceId) {
+        const result = await pool.query(`
+            SELECT * FROM alarm_events
+            WHERE device_id = $1 AND acknowledged_at IS NULL
+            ORDER BY received_at DESC
+            LIMIT 1
+        `, [deviceId]);
+        return result.rows[0] || null;
+    }
+
     // ==========================================
     // Statistics
     // ==========================================

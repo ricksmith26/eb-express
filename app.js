@@ -204,7 +204,10 @@ if (process.env.ASTERISK_AMI_HOST) {
   console.log('⚠️  ASTERISK_AMI_HOST not set - AMI integration disabled');
 }
 
-setupAgenda()
+// Initialize Agenda (includes telecare escalation service)
+setupAgenda().catch(err => {
+  console.error('❌ Error initializing agenda:', err);
+});
 
 function getUserEmail(socketId) {
   for (const [email, id] of users.entries()) {

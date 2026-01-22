@@ -4,6 +4,8 @@
  */
 import express from 'express';
 import telecareController from '../controllers/telecare-controller.js';
+import escalationConfig from '../config/telecare-escalation.js';
+import telecareEscalation from '../services/telecare-escalation-service.js';
 import { verifyCognitoToken, requirePractitioner } from '../middleware/cognitoAuth.js';
 import { setOrgContext, requireRole, requirePermission } from '../middleware/rbac.js';
 import { verifyAccessToken } from '../middleware/auth.js';
@@ -112,6 +114,90 @@ class TelecareRoutes {
         this.router.get('/admin/stats',
             requirePermission('devices:read'),
             telecareController.getStatistics.bind(telecareController)
+        );
+
+        /**
+         * Escalation Configuration
+         */
+
+        // GET /telecare/admin/escalation-config - Get escalation config
+        this.router.get('/admin/escalation-config',
+            requireRole('org_admin', 'super_admin'),
+            async (req, res) => {
+                try {
+                    const { organizationId } = req;
+                    const config = await escalationConfig.getConfig(organizationId);
+                    res.json(config);
+                } catch (error) {
+                    console.error('Error getting escalation config:', error);
+                    res.status(500).json({ error: 'Failed to get escalation config' });
+                }
+            }
+        );
+
+        // PUT /telecare/admin/escalation-config - Update escalation config
+        this.router.put('/admin/escalation-config',
+            requireRole('org_admin', 'super_admin'),
+            async (req, res) => {
+                try {
+                    const { organizationId } = req;
+                    const {
+                        firstEscalationSeconds,
+                        secondEscalationSeconds,
+                        maxRetries,
+                        supervisorEmail,
+                        supervisorPhone,
+                        enabled
+                    } = req.body;
+
+                    const config = await escalationConfig.updateConfig(organizationId, {
+                        firstEscalationSeconds,
+                        secondEscalationSeconds,
+                        maxRetries,
+                        supervisorEmail,
+                        supervisorPhone,
+                        enabled
+                    });
+
+                    res.json({
+                        message: 'Escalation config updated',
+                        config
+                    });
+                } catch (error) {
+                    console.error('Error updating escalation config:', error);
+                    res.status(500).json({ error: 'Failed to update escalation config' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/escalation-config/all - List all configs (super_admin only)
+        this.router.get('/admin/escalation-config/all',
+            requireRole('super_admin'),
+            async (req, res) => {
+                try {
+                    const configs = await escalationConfig.listConfigs();
+                    res.json(configs);
+                } catch (error) {
+                    console.error('Error listing escalation configs:', error);
+                    res.status(500).json({ error: 'Failed to list escalation configs' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/escalation-status - Get pending escalations count
+        this.router.get('/admin/escalation-status',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const pendingCount = await telecareEscalation.getPendingEscalationsCount();
+                    res.json({
+                        pendingEscalations: pendingCount
+                    });
+                } catch (error) {
+                    console.error('Error getting escalation status:', error);
+                    res.status(500).json({ error: 'Failed to get escalation status' });
+                }
+            }
         );
 
         // ==========================================

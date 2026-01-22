@@ -8,6 +8,7 @@ import moment from 'moment';
 import { WithingsService } from '../services/WithingsService.js';
 import brigidCalendarService from '../services/brigid-calendar-service.js';
 import { sendEventReminderNotification } from '../services/pushNotificationService.js';
+import telecareEscalation from '../services/telecare-escalation-service.js';
 import {
     WITHINGS_CLIENT_ID,
     WITHINGS_CLIENT_SECRET,
@@ -314,6 +315,10 @@ export const setupAgenda = async (io) => {
     await agenda.cancel({ name: 'withings-daily-sync' }); // Cancel any existing jobs
     await agenda.every('24 hours', 'withings-daily-sync');
     console.log("✅ Withings daily sync scheduled (every 24 hours)");
+
+    // Initialize telecare escalation service
+    await telecareEscalation.initialize(agenda, IO);
+    console.log("✅ Telecare escalation service initialized");
 
     // await agenda.schedule('in 10 seconds', 'test')
     // // await agenda.schedule('in 15 seconds', 'notify user of event', {email:'ricksmith69@gmail.com', event: {summary: 'party time', start: '09:00'}})

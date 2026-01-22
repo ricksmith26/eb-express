@@ -1,6 +1,7 @@
 import AsteriskManager from 'asterisk-manager';
 import queueController from '../controllers/queue-controller.js';
 import telecareService from './telecare-service.js';
+import telecareEscalation from './telecare-escalation-service.js';
 
 const LOG_PREFIX = '[AsteriskAMI]';
 
@@ -99,6 +100,18 @@ class AsteriskAMIService {
         try {
             const result = await queueController.addCustomerToQueue(customer);
             console.log(`${LOG_PREFIX} Customer added to queue controller:`, result);
+
+            // For telecare devices, trigger escalation if there's an unacknowledged alarm
+            if (calleridnum && calleridnum.startsWith('TC-')) {
+                console.log(`${LOG_PREFIX} Telecare device detected: ${calleridnum} - checking for alarm escalation`);
+                const alarm = await telecareService.getMostRecentUnacknowledgedAlarm(calleridnum);
+                if (alarm) {
+                    console.log(`${LOG_PREFIX} Found unacknowledged alarm ${alarm.id} - scheduling escalation`);
+                    await telecareEscalation.scheduleEscalation(alarm.id, calleridnum);
+                } else {
+                    console.log(`${LOG_PREFIX} No unacknowledged alarm found for device ${calleridnum}`);
+                }
+            }
         } catch (error) {
             console.error(`${LOG_PREFIX} Error adding customer to queue:`, error);
         }

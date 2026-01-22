@@ -1,4 +1,5 @@
 import telecareService from '../services/telecare-service.js';
+import telecareEscalation from '../services/telecare-escalation-service.js';
 
 class TelecareController {
     // ==========================================
@@ -282,6 +283,9 @@ class TelecareController {
             if (!alarm) {
                 return res.status(404).json({ error: 'Alarm not found', code: 'ALARM_NOT_FOUND' });
             }
+
+            // Cancel any pending escalation jobs for this alarm
+            await telecareEscalation.cancelEscalation(parseInt(alarmId));
 
             res.json({
                 message: 'Alarm acknowledged',
