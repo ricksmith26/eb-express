@@ -327,16 +327,30 @@ class TelecareService {
         return result.rows[0] || null;
     }
 
-    async acknowledgeAlarm(alarmId, acknowledgedBy, notes = null) {
+    async acknowledgeAlarm(alarmId, acknowledgedBy, { notes = null, outcomeCode = null } = {}) {
         const result = await pool.query(`
             UPDATE alarm_events
             SET acknowledged_at = CURRENT_TIMESTAMP,
                 acknowledged_by = $2,
-                notes = COALESCE($3, notes)
+                notes = COALESCE($3, notes),
+                outcome_code = COALESCE($4, outcome_code)
             WHERE id = $1
             RETURNING *
-        `, [alarmId, acknowledgedBy, notes]);
+        `, [alarmId, acknowledgedBy, notes, outcomeCode]);
         return result.rows[0];
+    }
+
+    /**
+     * Get available outcome codes for alarm acknowledgment
+     */
+    async getOutcomeCodes() {
+        const result = await pool.query(`
+            SELECT code, label, description, requires_followup
+            FROM alarm_outcome_codes
+            WHERE is_active = true
+            ORDER BY display_order
+        `);
+        return result.rows;
     }
 
     async getUnacknowledgedCount() {

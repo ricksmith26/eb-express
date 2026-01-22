@@ -106,6 +106,12 @@ class TelecareRoutes {
             telecareController.acknowledgeAlarm.bind(telecareController)
         );
 
+        // GET /telecare/admin/outcome-codes - Get alarm outcome codes
+        this.router.get('/admin/outcome-codes',
+            requirePermission('devices:read'),
+            telecareController.getOutcomeCodes.bind(telecareController)
+        );
+
         /**
          * Statistics
          */
@@ -220,6 +226,12 @@ class TelecareRoutes {
         this.router.post('/alarms/:alarmId/acknowledge',
             verifyAccessToken,
             telecareController.acknowledgeAlarm.bind(telecareController)
+        );
+
+        // GET /telecare/outcome-codes - Get alarm outcome codes (for agent)
+        this.router.get('/outcome-codes',
+            verifyAccessToken,
+            telecareController.getOutcomeCodes.bind(telecareController)
         );
 
         // GET /telecare/devices/:deviceId - Get device info (for agent during call)

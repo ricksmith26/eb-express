@@ -275,10 +275,10 @@ class TelecareController {
     async acknowledgeAlarm(req, res) {
         try {
             const { alarmId } = req.params;
-            const { notes } = req.body;
+            const { notes, outcomeCode } = req.body;
             const acknowledgedBy = req.user?.email || req.practitioner?.email || 'system';
 
-            const alarm = await telecareService.acknowledgeAlarm(alarmId, acknowledgedBy, notes);
+            const alarm = await telecareService.acknowledgeAlarm(alarmId, acknowledgedBy, { notes, outcomeCode });
 
             if (!alarm) {
                 return res.status(404).json({ error: 'Alarm not found', code: 'ALARM_NOT_FOUND' });
@@ -294,6 +294,16 @@ class TelecareController {
         } catch (error) {
             console.error('Error acknowledging alarm:', error);
             res.status(500).json({ error: 'Failed to acknowledge alarm', code: 'ALARM_ACK_ERROR' });
+        }
+    }
+
+    async getOutcomeCodes(req, res) {
+        try {
+            const codes = await telecareService.getOutcomeCodes();
+            res.json(codes);
+        } catch (error) {
+            console.error('Error getting outcome codes:', error);
+            res.status(500).json({ error: 'Failed to get outcome codes', code: 'OUTCOME_CODES_ERROR' });
         }
     }
 
@@ -384,6 +394,7 @@ class TelecareController {
             acknowledged: !!alarm.acknowledged_at,
             acknowledgedAt: alarm.acknowledged_at,
             acknowledgedBy: alarm.acknowledged_by,
+            outcomeCode: alarm.outcome_code,
             call: alarm.call_id ? {
                 callId: alarm.call_id,
                 startedAt: alarm.call_started_at,
