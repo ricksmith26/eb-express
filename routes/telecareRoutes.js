@@ -6,6 +6,7 @@ import express from 'express';
 import telecareController from '../controllers/telecare-controller.js';
 import escalationConfig from '../config/telecare-escalation.js';
 import telecareEscalation from '../services/telecare-escalation-service.js';
+import telecareDeviceMonitoring from '../services/telecare-device-monitoring-service.js';
 import { verifyCognitoToken, requirePractitioner } from '../middleware/cognitoAuth.js';
 import { setOrgContext, requireRole, requirePermission } from '../middleware/rbac.js';
 import { verifyAccessToken } from '../middleware/auth.js';
@@ -120,6 +121,57 @@ class TelecareRoutes {
         this.router.get('/admin/stats',
             requirePermission('devices:read'),
             telecareController.getStatistics.bind(telecareController)
+        );
+
+        /**
+         * Device Health Monitoring
+         */
+
+        // GET /telecare/admin/devices/health - Get device health summary
+        this.router.get('/admin/devices/health',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const health = await telecareDeviceMonitoring.getHealthSummary();
+                    res.json(health);
+                } catch (error) {
+                    console.error('Error getting device health:', error);
+                    res.status(500).json({ error: 'Failed to get device health' });
+                }
+            }
+        );
+
+        // POST /telecare/admin/devices/health/check - Run immediate health check
+        this.router.post('/admin/devices/health/check',
+            requireRole('org_admin', 'super_admin'),
+            async (req, res) => {
+                try {
+                    const result = await telecareDeviceMonitoring.runImmediateCheck();
+                    res.json({
+                        message: 'Health check completed',
+                        ...result
+                    });
+                } catch (error) {
+                    console.error('Error running health check:', error);
+                    res.status(500).json({ error: 'Failed to run health check' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/devices/:deviceId/status-history - Get device status history
+        this.router.get('/admin/devices/:deviceId/status-history',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const { deviceId } = req.params;
+                    const { limit = 50 } = req.query;
+                    const history = await telecareDeviceMonitoring.getDeviceStatusHistory(deviceId, parseInt(limit));
+                    res.json(history);
+                } catch (error) {
+                    console.error('Error getting device status history:', error);
+                    res.status(500).json({ error: 'Failed to get status history' });
+                }
+            }
         );
 
         /**
@@ -244,6 +296,20 @@ class TelecareRoutes {
         this.router.get('/stats',
             verifyAccessToken,
             telecareController.getStatistics.bind(telecareController)
+        );
+
+        // GET /telecare/devices/health - Get device health summary (for agent)
+        this.router.get('/devices/health',
+            verifyAccessToken,
+            async (req, res) => {
+                try {
+                    const health = await telecareDeviceMonitoring.getHealthSummary();
+                    res.json(health);
+                } catch (error) {
+                    console.error('Error getting device health:', error);
+                    res.status(500).json({ error: 'Failed to get device health' });
+                }
+            }
         );
     }
 
