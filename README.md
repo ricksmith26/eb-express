@@ -60,7 +60,7 @@ Environment variables are stored in AWS Elastic Beanstalk configuration and pers
 - `JWT_REFRESH_SECRET` - JWT refresh token secret
 - `LIVEKIT_API_KEY` - LiveKit API key
 - `LIVEKIT_API_SECRET` - LiveKit API secret
-- `LIVEKIT_URL=wss://personal-assistant-cv4hqx25.livekit.cloud`
+- `LIVEKIT_URL=wss://brigid-pi-u49mm2ww.livekit.cloud`
 
 #### Updating Environment Variables
 
