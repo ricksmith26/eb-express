@@ -28,8 +28,10 @@ import patientMediaRoutes from './routes/patient-media-routes.js';
 import recordingRoutes from './routes/recording-routes.js';
 import brigidCalendarRoutes from './routes/brigid-calendar-routes.js';
 import brigidCalendarService from './services/brigid-calendar-service.js';
+import appointmentNotificationService from './services/appointment-notification-service.js';
 import clinicalResourceRoutes from './routes/clinicalResourceRoutes.js';
 import deviceConnectionRoutes from './routes/deviceConnectionRoutes.js';
+import outboundCallRoutes from './routes/outbound-call-routes.js';
 
 // Admin Portal Routes
 import adminAuthRoutes from './routes/adminAuthRoutes.js';
@@ -178,6 +180,7 @@ app.use('/api/recordings', recordingRoutes);
 app.use('/brigid-calendar', brigidCalendarRoutes);
 app.use('/clinical', clinicalResourceRoutes);
 app.use('/device-connections', deviceConnectionRoutes);
+app.use('/outbound-call', outboundCallRoutes);
 
 // Admin Portal Routes (Cognito Auth)
 app.use('/admin/auth', adminAuthRoutes);
@@ -192,6 +195,9 @@ app.use('/telecare', telecareRoutes);
 
 // Inject Socket.IO into Brigid Calendar Service for real-time notifications
 brigidCalendarService.setSocketIO(io);
+
+// Inject Socket.IO into Appointment Notification Service for real-time notifications
+appointmentNotificationService.setSocketIO(io);
 
 // Initialize Asterisk AMI connection for queue management
 if (process.env.ASTERISK_AMI_HOST) {

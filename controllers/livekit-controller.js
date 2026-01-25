@@ -30,10 +30,15 @@ class LivekitController {
       const { email, message } = req.params;
       const isOnboarding = req.query.isOnboarding === 'true';
 
+      // Extract optional appointment notification params
+      const appointmentDate = req.query.appointmentDate;
+      const appointmentTime = req.query.appointmentTime;
+      const appointmentDoctor = req.query.appointmentDoctor;
+
       const participantToken = await this.createParticipantToken(
         { identity: participantIdentity, email, message },
         roomName,
-        { isOnboarding }
+        { isOnboarding, appointmentDate, appointmentTime, appointmentDoctor }
       );
 
       const newParticipant = new Participant({
@@ -56,7 +61,7 @@ class LivekitController {
     }
   }
 
-  async createParticipantToken(userInfo, roomName, { isOnboarding = false } = {}) {
+  async createParticipantToken(userInfo, roomName, { isOnboarding = false, appointmentDate, appointmentTime, appointmentDoctor } = {}) {
     try {
       const identifier = userInfo.email;
 
@@ -65,6 +70,11 @@ class LivekitController {
 
       let tokenMetadata;
       let identity;
+
+      // Build appointment notification object if any appointment params are present
+      const appointmentNotification = (appointmentDate || appointmentTime || appointmentDoctor)
+        ? { date: appointmentDate, time: appointmentTime, doctor: appointmentDoctor }
+        : null;
 
       if (isEmail) {
         // Existing flow: look up user by email
@@ -77,6 +87,7 @@ class LivekitController {
             name: user.name,
             initialPrompt: userInfo.message,
             isOnboarding,
+            appointmentNotification,
           };
         } else {
           // Fallback: look up patient by email in telecom array
@@ -98,6 +109,7 @@ class LivekitController {
             patientId: patient.id,
             isOnboarding,
             initialPrompt: userInfo.message,
+            appointmentNotification,
           };
         }
       } else {
@@ -107,6 +119,7 @@ class LivekitController {
           deviceId: identifier,
           isOnboarding,
           initialPrompt: userInfo.message,
+          appointmentNotification,
         };
       }
 
