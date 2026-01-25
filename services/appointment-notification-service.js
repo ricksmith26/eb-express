@@ -1,8 +1,10 @@
 import { users, getPreferredSocketId } from '../socketIo/socketIo.js';
+import { getDeviceSocketId } from '../socketIo/events/registerDevice.js';
 import { sendEventReminderNotification } from './pushNotificationService.js';
 import PendingNotification from '../models/PendingNotification.js';
 import User from '../models/User.js';
 import Patient from '../models/PatientSchema.js';
+import FhirDevice from '../models/FhirDevice.js';
 
 const LOG_PREFIX = '[AppointmentNotificationService]';
 
@@ -142,7 +144,7 @@ export async function sendAppointmentNotification(appointmentData) {
       },
       pushNotificationSent: pushSent,
       pushNotificationSentAt: pushSent ? new Date() : null,
-      // 4. Enable facial recognition trigger if user wasn't notified in real-time
+      // Enable facial recognition trigger if user wasn't notified in real-time
       facialRecognitionTrigger: !notifiedViaSocket,
     });
     console.log(`${LOG_PREFIX} Stored pending notification: ${pendingNotification.id}`);
@@ -150,11 +152,50 @@ export async function sendAppointmentNotification(appointmentData) {
     console.error(`${LOG_PREFIX} Error storing pending notification:`, error.message);
   }
 
+  // 4. If user wasn't notified via socket, send facial recognition activation to their Pi device
+  let facialRecognitionActivated = false;
+  if (!notifiedViaSocket && io && patientId) {
+    try {
+      // Find devices associated with this user's email
+      const devices = await FhirDevice.find({
+        'owner.email': userEmail,
+        status: 'active',
+      });
+
+      for (const device of devices) {
+        const deviceId = device.getDeviceId();
+        const deviceSocketId = getDeviceSocketId(deviceId);
+
+        if (deviceSocketId) {
+          // Emit to the device to activate facial recognition check
+          io.to(`device:${deviceId}`).emit('activateFacialRecognitionCheck', {
+            patientId,
+            patientName,
+            userEmail,
+            notificationId: pendingNotification?.id,
+            appointmentData: {
+              appointmentDate,
+              appointmentTime,
+              doctorName,
+              instructions,
+            },
+          });
+          facialRecognitionActivated = true;
+          console.log(`${LOG_PREFIX} Sent activateFacialRecognitionCheck to device ${deviceId}`);
+        } else {
+          console.log(`${LOG_PREFIX} Device ${deviceId} not connected, cannot activate FR`);
+        }
+      }
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error activating facial recognition:`, error.message);
+    }
+  }
+
   return {
     notifiedViaSocket,
     pushNotificationSent: pushSent,
     pendingNotificationId: pendingNotification?.id,
-    facialRecognitionEnabled: !notifiedViaSocket,
+    facialRecognitionActivated,
   };
 }
 
