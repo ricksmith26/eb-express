@@ -277,7 +277,7 @@ function parseAppointmentDateTime(dateStr, timeStr) {
     // Try parsing date separately
     const dateOnly = new Date(dateStr);
     if (!isNaN(dateOnly.getTime())) {
-      const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?/);
+      let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?/);
       if (timeMatch) {
         let hours = parseInt(timeMatch[1], 10);
         const minutes = parseInt(timeMatch[2], 10);
@@ -290,6 +290,22 @@ function parseAppointmentDateTime(dateStr, timeStr) {
         }
 
         dateOnly.setHours(hours, minutes, 0, 0);
+        return dateOnly;
+      }
+
+      // Try parsing time without minutes (e.g., "3 PM", "10 AM")
+      timeMatch = timeStr.match(/(\d{1,2})\s*(AM|PM|am|pm)/);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1], 10);
+        const period = timeMatch[2]?.toUpperCase();
+
+        if (period === 'PM' && hours !== 12) {
+          hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+          hours = 0;
+        }
+
+        dateOnly.setHours(hours, 0, 0, 0);
         return dateOnly;
       }
     }
