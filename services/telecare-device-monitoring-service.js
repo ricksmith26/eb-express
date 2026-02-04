@@ -49,6 +49,8 @@ class TelecareDeviceMonitoringService {
 
         try {
             // Get all active telecare devices with their expected qualify frequency
+            // Note: Asterisk stores contacts with aor in the id field as "DEVICE_ID;@hash"
+            // or in the aor column directly. We check both.
             const devicesResult = await pool.query(`
                 SELECT
                     td.device_id,
@@ -62,7 +64,11 @@ class TelecareDeviceMonitoringService {
                     EXTRACT(EPOCH FROM (NOW() - pc.reg_server::timestamp)) as seconds_since_registration
                 FROM telecare_devices td
                 LEFT JOIN ps_aors aor ON aor.id = td.device_id
-                LEFT JOIN ps_contacts pc ON pc.aor = td.device_id
+                LEFT JOIN ps_contacts pc ON (
+                    pc.aor = td.device_id
+                    OR pc.id LIKE td.device_id || ';%'
+                    OR pc.id LIKE td.device_id || '^3B%'
+                )
                 WHERE td.is_active = true
                   AND td.device_id LIKE 'TC-%'
             `);
@@ -236,12 +242,18 @@ class TelecareDeviceMonitoringService {
     async getHealthSummary() {
         try {
             // Get device counts
+            // Note: Asterisk stores contacts with aor in the id field as "DEVICE_ID;@hash"
+            // or in the aor column directly. We check both.
             const deviceCounts = await pool.query(`
                 SELECT
                     COUNT(*) FILTER (WHERE td.is_active = true) as total_active,
                     COUNT(*) FILTER (WHERE pc.uri IS NOT NULL) as online
                 FROM telecare_devices td
-                LEFT JOIN ps_contacts pc ON pc.aor = td.device_id
+                LEFT JOIN ps_contacts pc ON (
+                    pc.aor = td.device_id
+                    OR pc.id LIKE td.device_id || ';%'
+                    OR pc.id LIKE td.device_id || '^3B%'
+                )
                 WHERE td.device_id LIKE 'TC-%'
             `);
 
