@@ -8,6 +8,7 @@
  */
 import pool from '../config/postgres.js';
 import asteriskAMI from './asterisk-ami-service.js';
+import FhirDeviceMetric from '../models/FhirDeviceMetric.js';
 
 class TelecareDeviceMonitoringService {
     constructor() {
@@ -239,7 +240,7 @@ class TelecareDeviceMonitoringService {
 
     /**
      * Get current device health summary
-     * Uses AMI to check real-time PJSIP contact reachability
+     * Uses FHIR DeviceMetric as source of truth (updated by AMI events)
      */
     async getHealthSummary() {
         try {
@@ -253,74 +254,39 @@ class TelecareDeviceMonitoringService {
             const devices = devicesResult.rows;
             const total = devices.length;
 
-            // Get real-time contact status from AMI
-            let onlineDevices = new Set();
-            const amiConnected = asteriskAMI.isConnected();
-            console.log(`[TelecareMonitor] AMI connected: ${amiConnected}`);
+            // Get current status from FHIR DeviceMetric (source of truth)
+            const currentStatuses = await FhirDeviceMetric.getCurrentStatuses();
+            console.log(`[TelecareMonitor] Current statuses from FHIR:`, JSON.stringify(currentStatuses));
 
-            if (amiConnected) {
-                const contacts = await asteriskAMI.getPJSIPContacts();
-                console.log(`[TelecareMonitor] AMI contacts:`, JSON.stringify(contacts));
-                for (const contact of contacts) {
-                    // Extract device ID from AOR (e.g., "TC-1000")
-                    // Status can be 'Reachable', 'Available', 'Avail', etc.
-                    const isReachable = contact.status &&
-                        ['Reachable', 'Available', 'Avail'].some(s =>
-                            contact.status.toLowerCase().includes(s.toLowerCase())
-                        );
-                    if (contact.aor && contact.aor.startsWith('TC-') && isReachable) {
-                        onlineDevices.add(contact.aor);
-                    }
-                }
-                console.log(`[TelecareMonitor] Online devices from AMI:`, [...onlineDevices]);
+            // Build a map of device statuses
+            const statusMap = new Map();
+            for (const entry of currentStatuses) {
+                statusMap.set(entry._id, entry.status);
             }
 
-            if (!amiConnected) {
-                // Fallback to database check if AMI not connected
-                // Check expiration_time to see if contact is still valid
-                const contactsResult = await pool.query(`
-                    SELECT id, aor, expiration_time
-                    FROM ps_contacts
-                    WHERE expiration_time > EXTRACT(EPOCH FROM NOW())
-                `);
-                for (const contact of contactsResult.rows) {
-                    // Extract device ID from id field (format: "TC-1000^3B@hash")
-                    const match = contact.id?.match(/^(TC-\d+)/);
-                    if (match) {
-                        onlineDevices.add(match[1]);
-                    } else if (contact.aor?.startsWith('TC-')) {
-                        onlineDevices.add(contact.aor);
-                    }
+            // Count online devices
+            let onlineCount = 0;
+            const offlineDevicesList = [];
+
+            for (const device of devices) {
+                const status = statusMap.get(device.device_id);
+                if (status === 'online') {
+                    onlineCount++;
+                } else {
+                    // Device is offline or unknown
+                    offlineDevicesList.push({
+                        deviceId: device.device_id,
+                        userName: device.user_name,
+                        userPhone: device.user_phone
+                    });
                 }
             }
-
-            const online = devices.filter(d => onlineDevices.has(d.device_id)).length;
-
-            // Get unresolved offline events
-            const offlineEvents = await pool.query(`
-                SELECT
-                    dse.device_id,
-                    dse.last_seen,
-                    dse.detected_at,
-                    td.user_name,
-                    td.user_phone
-                FROM telecare_device_status_events dse
-                LEFT JOIN telecare_devices td ON td.device_id = dse.device_id
-                WHERE dse.status = 'offline' AND dse.resolved_at IS NULL
-                ORDER BY dse.detected_at DESC
-            `);
 
             return {
-                online,
-                offline: total - online,
+                online: onlineCount,
+                offline: total - onlineCount,
                 total,
-                offlineDevices: offlineEvents.rows.map(row => ({
-                    deviceId: row.device_id,
-                    userName: row.user_name,
-                    userPhone: row.user_phone,
-                    lastSeen: row.last_seen,
-                    offlineSince: row.detected_at
-                }))
+                offlineDevices: offlineDevicesList
             };
         } catch (error) {
             console.error('[TelecareMonitor] Error getting health summary:', error);
