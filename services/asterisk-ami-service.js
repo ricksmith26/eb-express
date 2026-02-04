@@ -85,7 +85,7 @@ class AsteriskAMIService {
 
         // Device state change events
         this.ami.on('devicestatechange', (event) => {
-            if (event.device && event.device.startsWith('PJSIP/TC-')) {
+            if (event.device && event.device.startsWith('PJSIP/')) {
                 this.handleDeviceStateChange(event);
             }
         });
@@ -124,7 +124,8 @@ class AsteriskAMIService {
             console.log(`${LOG_PREFIX} Customer added to queue controller:`, result);
 
             // For telecare devices, trigger escalation if there's an unacknowledged alarm
-            if (calleridnum && calleridnum.startsWith('TC-')) {
+            // Check if this is a telecare device (any device ID format)
+            if (calleridnum) {
                 console.log(`${LOG_PREFIX} Telecare device detected: ${calleridnum} - checking for alarm escalation`);
                 const alarm = await telecareService.getMostRecentUnacknowledgedAlarm(calleridnum);
                 if (alarm) {
@@ -147,25 +148,19 @@ class AsteriskAMIService {
         // channel is the caller's channel (e.g., PJSIP/TC-TEST-001-00000001)
         const { queue, channel, destchannel } = event;
 
-        // Check if this is a telecare device call (channel starts with PJSIP/TC-)
-        if (!channel || !channel.startsWith('PJSIP/TC-')) {
-            return; // Not a telecare call, ignore
+        // Check if this is a telecare device call (channel starts with PJSIP/)
+        if (!channel || !channel.startsWith('PJSIP/')) {
+            return; // Not a PJSIP call, ignore
         }
 
         // Extract device ID from channel name
-        // Format: PJSIP/TC-xxx-xxxxxxxx (8 hex digits at end are call counter)
-        const match = channel.match(/^PJSIP\/(TC-[^-]+-[^-]+)-/);
+        // Format: PJSIP/DEVICE_ID-xxxxxxxx (8 hex digits at end are call counter)
+        const match = channel.match(/^PJSIP\/([^-]+)-/);
         if (!match) {
-            // Try simpler format: PJSIP/TC-xxx-xxxxxxxx
-            const simpleMatch = channel.match(/^PJSIP\/(TC-[^-]+)-/);
-            if (!simpleMatch) {
-                console.log(`${LOG_PREFIX} Could not extract device ID from channel: ${channel}`);
-                return;
-            }
-            var deviceId = simpleMatch[1];
-        } else {
-            var deviceId = match[1];
+            console.log(`${LOG_PREFIX} Could not extract device ID from channel: ${channel}`);
+            return;
         }
+        const deviceId = match[1];
 
         console.log(`${LOG_PREFIX} Telecare call answered - Device: ${deviceId}, Agent: ${destchannel}`);
 
@@ -213,8 +208,8 @@ class AsteriskAMIService {
         // Event format: { aor, uri, contactstatus, roundtripusec }
         const { aor, contactstatus, uri } = event;
 
-        // Only process telecare devices (TC-xxxx)
-        if (!aor || !aor.startsWith('TC-')) {
+        // Skip if no AOR provided
+        if (!aor) {
             return;
         }
 
@@ -261,8 +256,8 @@ class AsteriskAMIService {
         // Event format: { device, state }
         const { device, state } = event;
 
-        // Extract device ID from "PJSIP/TC-1000"
-        const match = device?.match(/^PJSIP\/(TC-\d+)/);
+        // Extract device ID from "PJSIP/DEVICE_ID"
+        const match = device?.match(/^PJSIP\/([^\/]+)/);
         if (!match) return;
 
         const deviceId = match[1];

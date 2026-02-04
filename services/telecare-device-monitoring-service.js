@@ -72,7 +72,6 @@ class TelecareDeviceMonitoringService {
                     OR pc.id LIKE td.device_id || '^3B%'
                 )
                 WHERE td.is_active = true
-                  AND td.device_id LIKE 'TC-%'
             `);
 
             const devices = devicesResult.rows;
@@ -249,7 +248,7 @@ class TelecareDeviceMonitoringService {
             let query = `
                 SELECT device_id, user_name, user_phone
                 FROM telecare_devices
-                WHERE is_active = true AND device_id LIKE 'TC-%'
+                WHERE is_active = true
             `;
             const params = [];
 
