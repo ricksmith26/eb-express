@@ -201,6 +201,7 @@ appointmentNotificationService.setSocketIO(io);
 
 // Initialize Asterisk AMI connection for queue management
 if (process.env.ASTERISK_AMI_HOST) {
+  asteriskAMI.setSocketIO(io);  // Enable real-time telecare device status updates
   asteriskAMI.connect({
     host: process.env.ASTERISK_AMI_HOST,
     port: process.env.ASTERISK_AMI_PORT || 5038,

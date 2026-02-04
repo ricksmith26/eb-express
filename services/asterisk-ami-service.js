@@ -12,6 +12,15 @@ class AsteriskAMIService {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 5000;
+        this.io = null;  // Socket.IO instance for real-time updates
+    }
+
+    /**
+     * Set Socket.IO instance for emitting real-time events
+     */
+    setSocketIO(io) {
+        this.io = io;
+        console.log(`${LOG_PREFIX} Socket.IO instance set for real-time updates`);
     }
 
     /**
@@ -66,6 +75,18 @@ class AsteriskAMIService {
         this.ami.on('agentcomplete', (event) => {
             console.log(`${LOG_PREFIX} [AgentComplete] Call completed:`, JSON.stringify(event));
             this.handleAgentComplete(event);
+        });
+
+        // PJSIP Contact status events - for telecare device monitoring
+        this.ami.on('contactstatus', (event) => {
+            this.handleContactStatusChange(event);
+        });
+
+        // Device state change events
+        this.ami.on('devicestatechange', (event) => {
+            if (event.device && event.device.startsWith('PJSIP/TC-')) {
+                this.handleDeviceStateChange(event);
+            }
         });
 
         return this;
@@ -179,6 +200,63 @@ class AsteriskAMIService {
             console.log(`${LOG_PREFIX} Agent ${agentInterface} removed from Asterisk queue after call completion`);
         } catch (error) {
             console.error(`${LOG_PREFIX} Error removing agent from queue after call:`, error);
+        }
+    }
+
+    /**
+     * Handle PJSIP contact status change events
+     * Emits real-time updates via Socket.IO for telecare device monitoring
+     */
+    handleContactStatusChange(event) {
+        // Event format: { aor, uri, contactstatus, roundtripusec }
+        const { aor, contactstatus, uri } = event;
+
+        // Only process telecare devices (TC-xxxx)
+        if (!aor || !aor.startsWith('TC-')) {
+            return;
+        }
+
+        const isReachable = contactstatus === 'Reachable';
+        console.log(`${LOG_PREFIX} [ContactStatus] ${aor}: ${contactstatus}`);
+
+        // Emit Socket.IO event for real-time frontend updates
+        if (this.io) {
+            this.io.emit('telecareDeviceStatus', {
+                deviceId: aor,
+                status: isReachable ? 'online' : 'offline',
+                contactStatus: contactstatus,
+                uri: uri,
+                timestamp: new Date().toISOString()
+            });
+            console.log(`${LOG_PREFIX} Emitted telecareDeviceStatus: ${aor} -> ${contactstatus}`);
+        }
+    }
+
+    /**
+     * Handle device state change events
+     * Alternative event for tracking endpoint reachability
+     */
+    handleDeviceStateChange(event) {
+        // Event format: { device, state }
+        const { device, state } = event;
+
+        // Extract device ID from "PJSIP/TC-1000"
+        const match = device?.match(/^PJSIP\/(TC-\d+)/);
+        if (!match) return;
+
+        const deviceId = match[1];
+        const isOnline = state !== 'UNAVAILABLE' && state !== 'UNKNOWN';
+
+        console.log(`${LOG_PREFIX} [DeviceState] ${deviceId}: ${state}`);
+
+        // Emit Socket.IO event
+        if (this.io) {
+            this.io.emit('telecareDeviceStatus', {
+                deviceId: deviceId,
+                status: isOnline ? 'online' : 'offline',
+                deviceState: state,
+                timestamp: new Date().toISOString()
+            });
         }
     }
 
