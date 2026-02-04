@@ -1,12 +1,13 @@
 /**
  * Telecare Device Monitoring Service
- * Monitors SIP registration status of telecare devices via PJSIP ps_contacts table.
+ * Monitors SIP registration status of telecare devices via AMI and PJSIP.
  * Detects offline devices and emits alerts.
  *
  * This is SEPARATE from device-connection-service.js which handles web/app socket connections.
- * Telecare devices use SIP registration tracked in PostgreSQL ps_contacts table.
+ * Telecare devices use SIP registration - status is checked via AMI for real-time accuracy.
  */
 import pool from '../config/postgres.js';
+import asteriskAMI from './asterisk-ami-service.js';
 
 class TelecareDeviceMonitoringService {
     constructor() {
@@ -238,27 +239,50 @@ class TelecareDeviceMonitoringService {
 
     /**
      * Get current device health summary
+     * Uses AMI to check real-time PJSIP contact reachability
      */
     async getHealthSummary() {
         try {
-            // Get device counts
-            // Note: Asterisk stores contacts with aor in the id field as "DEVICE_ID;@hash"
-            // or in the aor column directly. We check both.
-            const deviceCounts = await pool.query(`
-                SELECT
-                    COUNT(*) FILTER (WHERE td.is_active = true) as total_active,
-                    COUNT(*) FILTER (WHERE pc.uri IS NOT NULL) as online
-                FROM telecare_devices td
-                LEFT JOIN ps_contacts pc ON (
-                    pc.aor = td.device_id
-                    OR pc.id LIKE td.device_id || ';%'
-                    OR pc.id LIKE td.device_id || '^3B%'
-                )
-                WHERE td.device_id LIKE 'TC-%'
+            // Get all active telecare devices
+            const devicesResult = await pool.query(`
+                SELECT device_id, user_name, user_phone
+                FROM telecare_devices
+                WHERE is_active = true AND device_id LIKE 'TC-%'
             `);
 
-            const total = parseInt(deviceCounts.rows[0].total_active) || 0;
-            const online = parseInt(deviceCounts.rows[0].online) || 0;
+            const devices = devicesResult.rows;
+            const total = devices.length;
+
+            // Get real-time contact status from AMI
+            let onlineDevices = new Set();
+            if (asteriskAMI.isConnected()) {
+                const contacts = await asteriskAMI.getPJSIPContacts();
+                for (const contact of contacts) {
+                    // Extract device ID from AOR (e.g., "TC-1000")
+                    if (contact.aor && contact.aor.startsWith('TC-') && contact.status === 'Reachable') {
+                        onlineDevices.add(contact.aor);
+                    }
+                }
+            } else {
+                // Fallback to database check if AMI not connected
+                // Check expiration_time to see if contact is still valid
+                const contactsResult = await pool.query(`
+                    SELECT id, aor, expiration_time
+                    FROM ps_contacts
+                    WHERE expiration_time > EXTRACT(EPOCH FROM NOW())
+                `);
+                for (const contact of contactsResult.rows) {
+                    // Extract device ID from id field (format: "TC-1000^3B@hash")
+                    const match = contact.id?.match(/^(TC-\d+)/);
+                    if (match) {
+                        onlineDevices.add(match[1]);
+                    } else if (contact.aor?.startsWith('TC-')) {
+                        onlineDevices.add(contact.aor);
+                    }
+                }
+            }
+
+            const online = devices.filter(d => onlineDevices.has(d.device_id)).length;
 
             // Get unresolved offline events
             const offlineEvents = await pool.query(`

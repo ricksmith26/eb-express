@@ -293,6 +293,91 @@ class AsteriskAMIService {
     }
 
     /**
+     * Get PJSIP endpoint status for telecare devices
+     * Returns a map of device_id -> { status: 'Reachable'|'Unreachable', ... }
+     */
+    async getPJSIPEndpointStatuses(deviceIds = []) {
+        if (!this.connected) {
+            console.log(`${LOG_PREFIX} Not connected to AMI, cannot check endpoint status`);
+            return {};
+        }
+
+        const statuses = {};
+
+        for (const deviceId of deviceIds) {
+            try {
+                const status = await new Promise((resolve, reject) => {
+                    this.ami.action({
+                        action: 'PJSIPShowEndpoint',
+                        endpoint: deviceId
+                    }, (err, response) => {
+                        if (err) {
+                            resolve({ status: 'Unknown', error: err.message });
+                        } else {
+                            // The response contains device state info
+                            resolve({
+                                status: response.devicestate || 'Unknown',
+                                activeChannels: response.activechannels || '0'
+                            });
+                        }
+                    });
+                });
+                statuses[deviceId] = status;
+            } catch (e) {
+                statuses[deviceId] = { status: 'Unknown', error: e.message };
+            }
+        }
+
+        return statuses;
+    }
+
+    /**
+     * Get all PJSIP contacts with their reachability status
+     * Uses PJSIPShowContacts AMI action
+     */
+    async getPJSIPContacts() {
+        if (!this.connected) {
+            console.log(`${LOG_PREFIX} Not connected to AMI, cannot check contacts`);
+            return [];
+        }
+
+        return new Promise((resolve, reject) => {
+            const contacts = [];
+
+            // Set up event handler for contact info events
+            const contactHandler = (event) => {
+                if (event.event === 'ContactStatusDetail') {
+                    contacts.push({
+                        aor: event.aor,
+                        uri: event.uri,
+                        status: event.status, // 'Reachable', 'Unreachable', etc.
+                        roundtripUsec: event.roundtripusec
+                    });
+                }
+            };
+
+            this.ami.on('contactstatusdetail', contactHandler);
+
+            this.ami.action({
+                action: 'PJSIPShowContacts'
+            }, (err, response) => {
+                // Remove the event handler after we get the response
+                this.ami.removeListener('contactstatusdetail', contactHandler);
+
+                if (err) {
+                    console.error(`${LOG_PREFIX} Error getting PJSIP contacts:`, err);
+                    resolve([]);
+                } else {
+                    // Give a short delay to collect all contact events
+                    setTimeout(() => {
+                        resolve(contacts);
+                    }, 100);
+                }
+            });
+        });
+    }
+
+    /**
      * Check if connected to AMI
      */
     isConnected() {
