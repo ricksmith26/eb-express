@@ -14,6 +14,7 @@ import RelatedPerson from '../models/RelatedPerson.js';
 import { verifyCognitoToken, requirePractitioner } from '../middleware/cognitoAuth.js';
 import { setOrgContext, requireRole, requirePermission } from '../middleware/rbac.js';
 import { verifyAccessToken } from '../middleware/auth.js';
+import { io } from '../app.js';
 
 class TelecareRoutes {
     constructor() {
@@ -532,7 +533,6 @@ class TelecareRoutes {
                     });
 
                     // Emit WebSocket event for real-time updates
-                    const io = req.app.get('io');
                     if (io) {
                         io.emit('telecarePowerStatus', {
                             deviceId,
