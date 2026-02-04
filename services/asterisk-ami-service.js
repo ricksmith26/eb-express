@@ -2,6 +2,7 @@ import AsteriskManager from 'asterisk-manager';
 import queueController from '../controllers/queue-controller.js';
 import telecareService from './telecare-service.js';
 import telecareEscalation from './telecare-escalation-service.js';
+import FhirDeviceMetric from '../models/FhirDeviceMetric.js';
 
 const LOG_PREFIX = '[AsteriskAMI]';
 
@@ -206,8 +207,9 @@ class AsteriskAMIService {
     /**
      * Handle PJSIP contact status change events
      * Emits real-time updates via Socket.IO for telecare device monitoring
+     * Logs all status changes to FHIR DeviceMetric for history
      */
-    handleContactStatusChange(event) {
+    async handleContactStatusChange(event) {
         // Event format: { aor, uri, contactstatus, roundtripusec }
         const { aor, contactstatus, uri } = event;
 
@@ -217,16 +219,34 @@ class AsteriskAMIService {
         }
 
         const isReachable = contactstatus === 'Reachable';
+        const status = isReachable ? 'online' : 'offline';
+        const timestamp = new Date();
+
         console.log(`${LOG_PREFIX} [ContactStatus] ${aor}: ${contactstatus}`);
+
+        // Log to FHIR DeviceMetric for history
+        try {
+            await FhirDeviceMetric.logStatusChange({
+                deviceId: aor,
+                status,
+                contactStatus: contactstatus,
+                uri,
+                timestamp,
+                source: 'ami-contact-status'
+            });
+            console.log(`${LOG_PREFIX} Logged status to FHIR: ${aor} -> ${status}`);
+        } catch (err) {
+            console.error(`${LOG_PREFIX} Error logging to FHIR:`, err.message);
+        }
 
         // Emit Socket.IO event for real-time frontend updates
         if (this.io) {
             this.io.emit('telecareDeviceStatus', {
                 deviceId: aor,
-                status: isReachable ? 'online' : 'offline',
+                status,
                 contactStatus: contactstatus,
-                uri: uri,
-                timestamp: new Date().toISOString()
+                uri,
+                timestamp: timestamp.toISOString()
             });
             console.log(`${LOG_PREFIX} Emitted telecareDeviceStatus: ${aor} -> ${contactstatus}`);
         }
@@ -235,8 +255,9 @@ class AsteriskAMIService {
     /**
      * Handle device state change events
      * Alternative event for tracking endpoint reachability
+     * Logs all status changes to FHIR DeviceMetric for history
      */
-    handleDeviceStateChange(event) {
+    async handleDeviceStateChange(event) {
         // Event format: { device, state }
         const { device, state } = event;
 
@@ -246,16 +267,31 @@ class AsteriskAMIService {
 
         const deviceId = match[1];
         const isOnline = state !== 'UNAVAILABLE' && state !== 'UNKNOWN';
+        const status = isOnline ? 'online' : 'offline';
+        const timestamp = new Date();
 
         console.log(`${LOG_PREFIX} [DeviceState] ${deviceId}: ${state}`);
+
+        // Log to FHIR DeviceMetric for history
+        try {
+            await FhirDeviceMetric.logStatusChange({
+                deviceId,
+                status,
+                deviceState: state,
+                timestamp,
+                source: 'ami-device-state'
+            });
+        } catch (err) {
+            console.error(`${LOG_PREFIX} Error logging device state to FHIR:`, err.message);
+        }
 
         // Emit Socket.IO event
         if (this.io) {
             this.io.emit('telecareDeviceStatus', {
-                deviceId: deviceId,
-                status: isOnline ? 'online' : 'offline',
+                deviceId,
+                status,
                 deviceState: state,
-                timestamp: new Date().toISOString()
+                timestamp: timestamp.toISOString()
             });
         }
     }

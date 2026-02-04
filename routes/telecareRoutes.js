@@ -7,6 +7,7 @@ import telecareController from '../controllers/telecare-controller.js';
 import escalationConfig from '../config/telecare-escalation.js';
 import telecareEscalation from '../services/telecare-escalation-service.js';
 import telecareDeviceMonitoring from '../services/telecare-device-monitoring-service.js';
+import FhirDeviceMetric from '../models/FhirDeviceMetric.js';
 import { verifyCognitoToken, requirePractitioner } from '../middleware/cognitoAuth.js';
 import { setOrgContext, requireRole, requirePermission } from '../middleware/rbac.js';
 import { verifyAccessToken } from '../middleware/auth.js';
@@ -26,6 +27,43 @@ class TelecareRoutes {
         this.router.use('/admin', verifyCognitoToken);
         this.router.use('/admin', requirePractitioner);
         this.router.use('/admin', setOrgContext);
+
+        /**
+         * Device Health Monitoring
+         * Note: These routes must be defined BEFORE /admin/devices/:deviceId
+         * to prevent the parameterized route from matching 'health' as a deviceId
+         */
+
+        // GET /telecare/admin/devices/health - Get device health summary
+        this.router.get('/admin/devices/health',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const health = await telecareDeviceMonitoring.getHealthSummary();
+                    res.json(health);
+                } catch (error) {
+                    console.error('Error getting device health:', error);
+                    res.status(500).json({ error: 'Failed to get device health' });
+                }
+            }
+        );
+
+        // POST /telecare/admin/devices/health/check - Run immediate health check
+        this.router.post('/admin/devices/health/check',
+            requireRole('org_admin', 'super_admin'),
+            async (req, res) => {
+                try {
+                    const result = await telecareDeviceMonitoring.runImmediateCheck();
+                    res.json({
+                        message: 'Health check completed',
+                        ...result
+                    });
+                } catch (error) {
+                    console.error('Error running health check:', error);
+                    res.status(500).json({ error: 'Failed to run health check' });
+                }
+            }
+        );
 
         /**
          * Device Management
@@ -123,42 +161,7 @@ class TelecareRoutes {
             telecareController.getStatistics.bind(telecareController)
         );
 
-        /**
-         * Device Health Monitoring
-         */
-
-        // GET /telecare/admin/devices/health - Get device health summary
-        this.router.get('/admin/devices/health',
-            requirePermission('devices:read'),
-            async (req, res) => {
-                try {
-                    const health = await telecareDeviceMonitoring.getHealthSummary();
-                    res.json(health);
-                } catch (error) {
-                    console.error('Error getting device health:', error);
-                    res.status(500).json({ error: 'Failed to get device health' });
-                }
-            }
-        );
-
-        // POST /telecare/admin/devices/health/check - Run immediate health check
-        this.router.post('/admin/devices/health/check',
-            requireRole('org_admin', 'super_admin'),
-            async (req, res) => {
-                try {
-                    const result = await telecareDeviceMonitoring.runImmediateCheck();
-                    res.json({
-                        message: 'Health check completed',
-                        ...result
-                    });
-                } catch (error) {
-                    console.error('Error running health check:', error);
-                    res.status(500).json({ error: 'Failed to run health check' });
-                }
-            }
-        );
-
-        // GET /telecare/admin/devices/:deviceId/status-history - Get device status history
+        // GET /telecare/admin/devices/:deviceId/status-history - Get device status history (PostgreSQL)
         this.router.get('/admin/devices/:deviceId/status-history',
             requirePermission('devices:read'),
             async (req, res) => {
@@ -170,6 +173,56 @@ class TelecareRoutes {
                 } catch (error) {
                     console.error('Error getting device status history:', error);
                     res.status(500).json({ error: 'Failed to get status history' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/devices/:deviceId/metrics - Get FHIR DeviceMetric history
+        this.router.get('/admin/devices/:deviceId/metrics',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const { deviceId } = req.params;
+                    const { limit = 100, since } = req.query;
+                    const history = await FhirDeviceMetric.getHistory(deviceId, {
+                        limit: parseInt(limit),
+                        since
+                    });
+                    res.json(history);
+                } catch (error) {
+                    console.error('Error getting device metrics:', error);
+                    res.status(500).json({ error: 'Failed to get device metrics' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/devices/:deviceId/uptime - Get device uptime statistics
+        this.router.get('/admin/devices/:deviceId/uptime',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const { deviceId } = req.params;
+                    const { hours = 24 } = req.query;
+                    const stats = await FhirDeviceMetric.getUptimeStats(deviceId, parseInt(hours));
+                    res.json(stats);
+                } catch (error) {
+                    console.error('Error getting device uptime:', error);
+                    res.status(500).json({ error: 'Failed to get uptime stats' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/metrics/recent - Get recent status changes across all devices
+        this.router.get('/admin/metrics/recent',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const { minutes = 60 } = req.query;
+                    const changes = await FhirDeviceMetric.getRecentChanges(parseInt(minutes));
+                    res.json(changes);
+                } catch (error) {
+                    console.error('Error getting recent metrics:', error);
+                    res.status(500).json({ error: 'Failed to get recent metrics' });
                 }
             }
         );
