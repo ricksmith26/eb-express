@@ -39,7 +39,8 @@ class TelecareRoutes {
             requirePermission('devices:read'),
             async (req, res) => {
                 try {
-                    const health = await telecareDeviceMonitoring.getHealthSummary();
+                    const { organizationId } = req;
+                    const health = await telecareDeviceMonitoring.getHealthSummary(organizationId);
                     res.json(health);
                 } catch (error) {
                     console.error('Error getting device health:', error);
@@ -356,7 +357,8 @@ class TelecareRoutes {
             verifyAccessToken,
             async (req, res) => {
                 try {
-                    const health = await telecareDeviceMonitoring.getHealthSummary();
+                    const { organizationId } = req;
+                    const health = await telecareDeviceMonitoring.getHealthSummary(organizationId);
                     res.json(health);
                 } catch (error) {
                     console.error('Error getting device health:', error);

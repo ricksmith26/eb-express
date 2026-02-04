@@ -241,15 +241,24 @@ class TelecareDeviceMonitoringService {
     /**
      * Get current device health summary
      * Uses FHIR DeviceMetric as source of truth (updated by AMI events)
+     * @param {string} organizationId - Optional organization filter
      */
-    async getHealthSummary() {
+    async getHealthSummary(organizationId) {
         try {
-            // Get all active telecare devices
-            const devicesResult = await pool.query(`
+            // Get all active telecare devices (optionally filtered by organization)
+            let query = `
                 SELECT device_id, user_name, user_phone
                 FROM telecare_devices
                 WHERE is_active = true AND device_id LIKE 'TC-%'
-            `);
+            `;
+            const params = [];
+
+            if (organizationId) {
+                query += ` AND organization_id = $1`;
+                params.push(organizationId);
+            }
+
+            const devicesResult = await pool.query(query, params);
 
             const devices = devicesResult.rows;
             const total = devices.length;
