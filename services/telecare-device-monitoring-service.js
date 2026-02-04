@@ -255,15 +255,27 @@ class TelecareDeviceMonitoringService {
 
             // Get real-time contact status from AMI
             let onlineDevices = new Set();
-            if (asteriskAMI.isConnected()) {
+            const amiConnected = asteriskAMI.isConnected();
+            console.log(`[TelecareMonitor] AMI connected: ${amiConnected}`);
+
+            if (amiConnected) {
                 const contacts = await asteriskAMI.getPJSIPContacts();
+                console.log(`[TelecareMonitor] AMI contacts:`, JSON.stringify(contacts));
                 for (const contact of contacts) {
                     // Extract device ID from AOR (e.g., "TC-1000")
-                    if (contact.aor && contact.aor.startsWith('TC-') && contact.status === 'Reachable') {
+                    // Status can be 'Reachable', 'Available', 'Avail', etc.
+                    const isReachable = contact.status &&
+                        ['Reachable', 'Available', 'Avail'].some(s =>
+                            contact.status.toLowerCase().includes(s.toLowerCase())
+                        );
+                    if (contact.aor && contact.aor.startsWith('TC-') && isReachable) {
                         onlineDevices.add(contact.aor);
                     }
                 }
-            } else {
+                console.log(`[TelecareMonitor] Online devices from AMI:`, [...onlineDevices]);
+            }
+
+            if (!amiConnected) {
                 // Fallback to database check if AMI not connected
                 // Check expiration_time to see if contact is still valid
                 const contactsResult = await pool.query(`
