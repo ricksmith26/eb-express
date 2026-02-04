@@ -231,6 +231,45 @@ class TelecareRoutes {
             }
         );
 
+        // GET /telecare/admin/devices/:deviceId/power-status - Get device power status
+        this.router.get('/admin/devices/:deviceId/power-status',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const { deviceId } = req.params;
+                    const { history, limit = 50 } = req.query;
+
+                    if (history === 'true') {
+                        // Return power status history
+                        const events = await FhirDeviceMetric.getPowerHistory(deviceId, {
+                            limit: parseInt(limit)
+                        });
+                        res.json({
+                            deviceId,
+                            history: events.map(e => ({
+                                powerStatus: e.powerStatus,
+                                previousPowerStatus: e.previousPowerStatus,
+                                batteryPercent: e.batteryPercent,
+                                timestamp: e.timestamp
+                            }))
+                        });
+                    } else {
+                        // Return current power status
+                        const current = await FhirDeviceMetric.getCurrentPowerStatus(deviceId);
+                        res.json({
+                            deviceId,
+                            powerStatus: current?.powerStatus || 'unknown',
+                            batteryPercent: current?.batteryPercent,
+                            lastUpdated: current?.timestamp || null
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error getting device power status:', error);
+                    res.status(500).json({ error: 'Failed to get power status' });
+                }
+            }
+        );
+
         // GET /telecare/admin/devices/:deviceId/patient - Get linked patient and related persons
         this.router.get('/admin/devices/:deviceId/patient',
             requirePermission('devices:read'),
@@ -458,6 +497,66 @@ class TelecareRoutes {
                 } catch (error) {
                     console.error('Error getting device health:', error);
                     res.status(500).json({ error: 'Failed to get device health' });
+                }
+            }
+        );
+
+        // POST /telecare/devices/:deviceId/power-status - Report power status from Pi UPS service
+        this.router.post('/devices/:deviceId/power-status',
+            verifyAccessToken,
+            async (req, res) => {
+                try {
+                    const { deviceId } = req.params;
+                    const { powerStatus, batteryPercent } = req.body;
+
+                    if (!powerStatus || !['mains', 'battery', 'unknown'].includes(powerStatus)) {
+                        return res.status(400).json({
+                            error: 'Invalid powerStatus. Must be: mains, battery, or unknown'
+                        });
+                    }
+
+                    // Verify device exists
+                    const device = await telecareService.getDevice(deviceId);
+                    if (!device) {
+                        return res.status(404).json({ error: 'Device not found' });
+                    }
+
+                    // Log the power status change
+                    const metric = await FhirDeviceMetric.logPowerStatusChange({
+                        deviceId,
+                        powerStatus,
+                        batteryPercent: batteryPercent !== undefined ? parseInt(batteryPercent) : undefined,
+                        context: {
+                            organizationId: device.organization_id
+                        }
+                    });
+
+                    // Emit WebSocket event for real-time updates
+                    const io = req.app.get('io');
+                    if (io) {
+                        io.emit('telecarePowerStatus', {
+                            deviceId,
+                            powerStatus,
+                            batteryPercent: metric.batteryPercent,
+                            previousPowerStatus: metric.previousPowerStatus,
+                            timestamp: metric.timestamp
+                        });
+                    }
+
+                    res.json({
+                        message: 'Power status updated',
+                        metric: {
+                            id: metric.id,
+                            deviceId: metric.deviceId,
+                            powerStatus: metric.powerStatus,
+                            previousPowerStatus: metric.previousPowerStatus,
+                            batteryPercent: metric.batteryPercent,
+                            timestamp: metric.timestamp
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error updating power status:', error);
+                    res.status(500).json({ error: 'Failed to update power status' });
                 }
             }
         );
