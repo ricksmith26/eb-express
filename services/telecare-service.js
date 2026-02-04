@@ -56,16 +56,6 @@ class TelecareService {
 
     async createDevice({
         deviceId,
-        userName,
-        userAddress,
-        userPhone,
-        emergencyContactName,
-        emergencyContactPhone,
-        emergencyContactRelationship,
-        secondaryContactName,
-        secondaryContactPhone,
-        gpName,
-        gpPhone,
         deviceType,
         deviceModel,
         organizationId,
@@ -73,6 +63,8 @@ class TelecareService {
         patientId,
         notes
     }) {
+        // Contact info (user, emergencyContact, secondaryContact, gp) is stored in MongoDB
+        // Patient and RelatedPerson collections - not in PostgreSQL
         const client = await pool.connect();
 
         try {
@@ -112,23 +104,10 @@ class TelecareService {
             // 4. Create telecare_devices entry
             const deviceResult = await client.query(`
                 INSERT INTO telecare_devices (
-                    device_id, user_name, user_address, user_phone,
-                    emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-                    secondary_contact_name, secondary_contact_phone,
-                    gp_name, gp_phone, device_type, device_model,
+                    device_id, device_type, device_model,
                     organization_id, fhir_device_id, patient_id, notes, is_active
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
                 ON CONFLICT (device_id) DO UPDATE SET
-                    user_name = EXCLUDED.user_name,
-                    user_address = EXCLUDED.user_address,
-                    user_phone = EXCLUDED.user_phone,
-                    emergency_contact_name = EXCLUDED.emergency_contact_name,
-                    emergency_contact_phone = EXCLUDED.emergency_contact_phone,
-                    emergency_contact_relationship = EXCLUDED.emergency_contact_relationship,
-                    secondary_contact_name = EXCLUDED.secondary_contact_name,
-                    secondary_contact_phone = EXCLUDED.secondary_contact_phone,
-                    gp_name = EXCLUDED.gp_name,
-                    gp_phone = EXCLUDED.gp_phone,
                     device_type = EXCLUDED.device_type,
                     device_model = EXCLUDED.device_model,
                     organization_id = EXCLUDED.organization_id,
@@ -137,13 +116,7 @@ class TelecareService {
                     notes = EXCLUDED.notes,
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING *
-            `, [
-                deviceId, userName, userAddress, userPhone,
-                emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
-                secondaryContactName, secondaryContactPhone,
-                gpName, gpPhone, deviceType, deviceModel,
-                organizationId, fhirDeviceId, patientId, notes
-            ]);
+            `, [deviceId, deviceType, deviceModel, organizationId, fhirDeviceId, patientId, notes]);
 
             await client.query('COMMIT');
 
@@ -160,11 +133,9 @@ class TelecareService {
     }
 
     async updateDevice(deviceId, updates) {
+        // Contact info is stored in MongoDB - only device-specific fields allowed here
         const allowedFields = [
-            'user_name', 'user_address', 'user_phone',
-            'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
-            'secondary_contact_name', 'secondary_contact_phone',
-            'gp_name', 'gp_phone', 'device_type', 'device_model',
+            'device_type', 'device_model',
             'organization_id', 'fhir_device_id', 'patient_id', 'notes', 'is_active'
         ];
 
@@ -247,27 +218,18 @@ class TelecareService {
     }
 
     /**
-     * Get device with full user/patient information for incoming calls.
-     * Used by queue controller to enrich emergencyCallConnection events.
+     * Get device info for incoming calls.
+     * Contact info should be fetched from MongoDB using patient_id.
      */
     async getDeviceWithPatientInfo(deviceId) {
         const result = await pool.query(`
             SELECT
                 td.device_id,
-                td.user_name,
-                td.user_address,
-                td.user_phone,
-                td.emergency_contact_name,
-                td.emergency_contact_phone,
-                td.emergency_contact_relationship,
-                td.secondary_contact_name,
-                td.secondary_contact_phone,
-                td.gp_name,
-                td.gp_phone,
                 td.device_type,
                 td.device_model,
                 td.patient_id,
                 td.fhir_device_id,
+                td.organization_id,
                 td.is_active
             FROM telecare_devices td
             WHERE td.device_id = $1 AND td.is_active = true
@@ -288,8 +250,9 @@ class TelecareService {
     // ==========================================
 
     async listAlarms({ deviceId, acknowledged, limit = 50, offset = 0 }) {
+        // Contact info is stored in MongoDB - use patient_id to lookup
         let query = `
-            SELECT ae.*, td.user_name, td.user_address, td.user_phone
+            SELECT ae.*, td.patient_id
             FROM alarm_events ae
             LEFT JOIN telecare_devices td ON td.device_id = ae.device_id
             WHERE 1=1
@@ -316,10 +279,9 @@ class TelecareService {
     }
 
     async getAlarm(alarmId) {
+        // Contact info is stored in MongoDB - use patient_id to lookup
         const result = await pool.query(`
-            SELECT ae.*, td.user_name, td.user_address, td.user_phone,
-                   td.emergency_contact_name, td.emergency_contact_phone,
-                   td.gp_name, td.gp_phone
+            SELECT ae.*, td.patient_id
             FROM alarm_events ae
             LEFT JOIN telecare_devices td ON td.device_id = ae.device_id
             WHERE ae.id = $1

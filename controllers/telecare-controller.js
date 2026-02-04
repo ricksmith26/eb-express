@@ -53,18 +53,9 @@ class TelecareController {
     async createDevice(req, res) {
         try {
             const { organizationId } = req;
+            // Contact info is stored in MongoDB (Patient/RelatedPerson) - not in PostgreSQL
             const {
                 deviceId,
-                userName,
-                userAddress,
-                userPhone,
-                emergencyContactName,
-                emergencyContactPhone,
-                emergencyContactRelationship,
-                secondaryContactName,
-                secondaryContactPhone,
-                gpName,
-                gpPhone,
                 deviceType,
                 deviceModel,
                 fhirDeviceId,
@@ -77,16 +68,6 @@ class TelecareController {
 
             const device = await telecareService.createDevice({
                 deviceId: finalDeviceId,
-                userName,
-                userAddress,
-                userPhone,
-                emergencyContactName,
-                emergencyContactPhone,
-                emergencyContactRelationship,
-                secondaryContactName,
-                secondaryContactPhone,
-                gpName,
-                gpPhone,
                 deviceType,
                 deviceModel,
                 organizationId,
@@ -327,30 +308,14 @@ class TelecareController {
     // ==========================================
 
     formatDeviceResponse(device) {
+        // Contact info (user, emergencyContact, secondaryContact, gp) is stored in MongoDB
+        // Patient and RelatedPerson collections - not in PostgreSQL telecare_devices table
         return {
             resourceType: 'TelecareDevice',
             id: device.device_id,
             status: device.is_active ? 'active' : 'inactive',
             deviceType: device.device_type,
             deviceModel: device.device_model,
-            user: {
-                name: device.user_name,
-                address: device.user_address,
-                phone: device.user_phone
-            },
-            emergencyContact: {
-                name: device.emergency_contact_name,
-                phone: device.emergency_contact_phone,
-                relationship: device.emergency_contact_relationship
-            },
-            secondaryContact: {
-                name: device.secondary_contact_name,
-                phone: device.secondary_contact_phone
-            },
-            gp: {
-                name: device.gp_name,
-                phone: device.gp_phone
-            },
             sipConfig: {
                 transport: device.transport,
                 webrtc: device.webrtc === 'yes',
@@ -370,6 +335,8 @@ class TelecareController {
     }
 
     formatAlarmResponse(alarm) {
+        // Contact info (user, emergencyContact, gp) is stored in MongoDB
+        // Use patientId to lookup from Patient and RelatedPerson collections
         return {
             resourceType: 'TelecareAlarm',
             id: alarm.id,
@@ -377,19 +344,7 @@ class TelecareController {
             alarmType: alarm.alarm_type,
             alarmCode: alarm.alarm_code,
             location: alarm.location,
-            user: {
-                name: alarm.user_name,
-                address: alarm.user_address,
-                phone: alarm.user_phone
-            },
-            emergencyContact: alarm.emergency_contact_name ? {
-                name: alarm.emergency_contact_name,
-                phone: alarm.emergency_contact_phone
-            } : undefined,
-            gp: alarm.gp_name ? {
-                name: alarm.gp_name,
-                phone: alarm.gp_phone
-            } : undefined,
+            patientId: alarm.patient_id,
             receivedAt: alarm.received_at,
             acknowledged: !!alarm.acknowledged_at,
             acknowledgedAt: alarm.acknowledged_at,
