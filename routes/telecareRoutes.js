@@ -248,15 +248,22 @@ class TelecareRoutes {
                         return res.json({ patient: null, relatedPersons: [] });
                     }
 
-                    // Fetch patient from MongoDB
-                    const patient = await Patient.findOne({ id: device.patient_id });
+                    // Fetch patient from MongoDB (patient_id could be FHIR id or MongoDB _id)
+                    let patient = await Patient.findOne({ id: device.patient_id });
+                    if (!patient) {
+                        // Try by MongoDB _id
+                        patient = await Patient.findById(device.patient_id).catch(() => null);
+                    }
                     if (!patient) {
                         return res.json({ patient: null, relatedPersons: [] });
                     }
 
+                    // Use the FHIR id for RelatedPerson lookup
+                    const patientFhirId = patient.id;
+
                     // Fetch related persons for this patient
                     const relatedPersons = await RelatedPerson.find({
-                        'patient.reference': { $in: [`Patient/${device.patient_id}`, device.patient_id] }
+                        'patient.reference': { $in: [`Patient/${patientFhirId}`, patientFhirId, `Patient/${device.patient_id}`, device.patient_id] }
                     });
 
                     // Format patient response
