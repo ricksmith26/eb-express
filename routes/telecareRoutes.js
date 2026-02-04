@@ -7,7 +7,10 @@ import telecareController from '../controllers/telecare-controller.js';
 import escalationConfig from '../config/telecare-escalation.js';
 import telecareEscalation from '../services/telecare-escalation-service.js';
 import telecareDeviceMonitoring from '../services/telecare-device-monitoring-service.js';
+import telecareService from '../services/telecare-service.js';
 import FhirDeviceMetric from '../models/FhirDeviceMetric.js';
+import Patient from '../models/PatientSchema.js';
+import RelatedPerson from '../models/RelatedPerson.js';
 import { verifyCognitoToken, requirePractitioner } from '../middleware/cognitoAuth.js';
 import { setOrgContext, requireRole, requirePermission } from '../middleware/rbac.js';
 import { verifyAccessToken } from '../middleware/auth.js';
@@ -224,6 +227,91 @@ class TelecareRoutes {
                 } catch (error) {
                     console.error('Error getting recent metrics:', error);
                     res.status(500).json({ error: 'Failed to get recent metrics' });
+                }
+            }
+        );
+
+        // GET /telecare/admin/devices/:deviceId/patient - Get linked patient and related persons
+        this.router.get('/admin/devices/:deviceId/patient',
+            requirePermission('devices:read'),
+            async (req, res) => {
+                try {
+                    const { deviceId } = req.params;
+
+                    // Get device to find patient_id
+                    const device = await telecareService.getDevice(deviceId);
+                    if (!device) {
+                        return res.status(404).json({ error: 'Device not found' });
+                    }
+
+                    if (!device.patient_id) {
+                        return res.json({ patient: null, relatedPersons: [] });
+                    }
+
+                    // Fetch patient from MongoDB
+                    const patient = await Patient.findOne({ id: device.patient_id });
+                    if (!patient) {
+                        return res.json({ patient: null, relatedPersons: [] });
+                    }
+
+                    // Fetch related persons for this patient
+                    const relatedPersons = await RelatedPerson.find({
+                        'patient.reference': { $in: [`Patient/${device.patient_id}`, device.patient_id] }
+                    });
+
+                    // Format patient response
+                    const patientResponse = {
+                        id: patient.id,
+                        name: patient.name?.[0] ? {
+                            given: patient.name[0].given?.join(' '),
+                            family: patient.name[0].family,
+                            full: `${patient.name[0].given?.join(' ') || ''} ${patient.name[0].family || ''}`.trim()
+                        } : null,
+                        gender: patient.gender,
+                        birthDate: patient.birthDate,
+                        address: patient.address?.[0] ? {
+                            line: patient.address[0].line?.join(', '),
+                            city: patient.address[0].city,
+                            postalCode: patient.address[0].postalCode,
+                            full: [
+                                patient.address[0].line?.join(', '),
+                                patient.address[0].city,
+                                patient.address[0].postalCode
+                            ].filter(Boolean).join(', ')
+                        } : null,
+                        telecom: patient.telecom?.map(t => ({
+                            system: t.system,
+                            value: t.value,
+                            use: t.use
+                        })) || [],
+                        identifier: patient.identifier?.find(i => i.system?.includes('nhs'))?.value || null,
+                        medicalInfo: patient.medicalInfo || null
+                    };
+
+                    // Format related persons
+                    const relatedPersonsResponse = relatedPersons.map(rp => ({
+                        id: rp.id,
+                        name: rp.name?.[0] ? {
+                            given: rp.name[0].given?.join(' '),
+                            family: rp.name[0].family,
+                            full: `${rp.name[0].given?.join(' ') || ''} ${rp.name[0].family || ''}`.trim()
+                        } : null,
+                        relationship: rp.relationship?.[0]?.coding?.[0]?.display ||
+                            rp.relationship?.[0]?.coding?.[0]?.code || 'Contact',
+                        telecom: rp.telecom?.map(t => ({
+                            system: t.system,
+                            value: t.value,
+                            use: t.use
+                        })) || []
+                    }));
+
+                    res.json({
+                        patient: patientResponse,
+                        relatedPersons: relatedPersonsResponse
+                    });
+                } catch (error) {
+                    console.error('Error getting device patient data:', error);
+                    res.status(500).json({ error: 'Failed to get patient data' });
                 }
             }
         );
