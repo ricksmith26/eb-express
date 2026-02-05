@@ -127,12 +127,36 @@ export class QueueController {
                 .catch(err => console.error(`${LOG_PREFIX} Failed to add agent to Asterisk queue:`, err));
 
             // For telecare devices, lookup patient ID for FHIR Patient lookup
-            // Telecare device IDs start with 'TC-' (e.g., TC-PI-TEST-001)
+            // Detect telecare device from multiple possible formats
             const callerId = pairing.customer?.callerIdNum;
-            if (callerId && callerId.startsWith('TC-')) {
-                console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Telecare device detected: ${callerId}`);
+            const channel = pairing.customer?.channel;
+            let deviceId = null;
+
+            console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Checking for telecare device - callerId: ${callerId}, channel: ${channel}`);
+
+            // Method 1: Hardware fingerprint format (16 hex characters like A10C87143249C1A1)
+            if (callerId && /^[A-F0-9]{16}$/i.test(callerId)) {
+                deviceId = callerId;
+                console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Detected hardware fingerprint device ID: ${deviceId}`);
+            }
+            // Method 2: Legacy TC- prefix format
+            else if (callerId && callerId.startsWith('TC-')) {
+                deviceId = callerId.replace(/^TC-/, '');
+                console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Detected TC- prefixed device ID: ${deviceId}`);
+            }
+            // Method 3: PJSIP channel format (PJSIP/A10C87143249C1A1-00000000)
+            else if (channel && channel.includes('PJSIP/')) {
+                const match = channel.match(/PJSIP\/([A-Z0-9]{16})/i);
+                if (match) {
+                    deviceId = match[1];
+                    console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Detected device ID from PJSIP channel: ${deviceId}`);
+                }
+            }
+
+            if (deviceId) {
+                console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Telecare device detected: ${deviceId}`);
                 try {
-                    const deviceInfo = await telecareService.getDeviceWithPatientInfo(callerId);
+                    const deviceInfo = await telecareService.getDeviceWithPatientInfo(deviceId);
                     if (deviceInfo) {
                         console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Found telecare device:`, JSON.stringify({
                             deviceId: deviceInfo.device_id,
@@ -144,11 +168,13 @@ export class QueueController {
                             patientId: deviceInfo.patient_id,
                         };
                     } else {
-                        console.log(`${LOG_PREFIX} [pairCustomerAndAgent] No telecare device info found for: ${callerId}`);
+                        console.warn(`${LOG_PREFIX} [pairCustomerAndAgent] No telecare device info found in database for: ${deviceId}`);
                     }
                 } catch (err) {
                     console.error(`${LOG_PREFIX} [pairCustomerAndAgent] Error fetching telecare device info:`, err);
                 }
+            } else {
+                console.log(`${LOG_PREFIX} [pairCustomerAndAgent] Not a telecare device call`);
             }
         }
 
