@@ -522,8 +522,6 @@ class TelecareController {
     // ==========================================
 
     formatDeviceResponse(device) {
-        // Contact info (user, emergencyContact, secondaryContact, gp) is stored in MongoDB
-        // Patient and RelatedPerson collections - not in PostgreSQL telecare_devices table
         return {
             resourceType: 'TelecareDevice',
             id: device.device_id,
@@ -539,6 +537,16 @@ class TelecareController {
                 fhirDeviceId: device.fhir_device_id,
                 patientId: device.patient_id,
                 organizationId: device.organization_id
+            },
+            user: {
+                name: device.user_name || null,
+                phone: device.user_phone || null,
+                address: device.user_address || null,
+            },
+            emergencyContact: {
+                name: device.emergency_contact_name || null,
+                phone: device.emergency_contact_phone || null,
+                relationship: device.emergency_contact_relationship || null,
             },
             notes: device.notes,
             lastRegistration: device.last_registration,

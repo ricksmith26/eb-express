@@ -237,9 +237,11 @@ FhirDeviceMetricSchema.statics.getHistory = function(deviceId, options = {}) {
 
 /**
  * Get current status for all devices
+ * Only considers sip-registration-status metrics (not power-status events)
  */
 FhirDeviceMetricSchema.statics.getCurrentStatuses = async function() {
   return this.aggregate([
+    { $match: { 'type.coding.code': 'sip-registration-status' } },
     { $sort: { deviceId: 1, timestamp: -1 } },
     {
       $group: {
