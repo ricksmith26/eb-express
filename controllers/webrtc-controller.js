@@ -33,12 +33,26 @@ class WebRTCController {
       console.log(`[WebRTC Controller] Caller ${fromEmail} has ${callerConnections.length} connection(s)`);
 
       if (recipientSocketId) {
-        io.to(recipientSocketId).emit('message', { type: 'WEBRTC', message, fromEmail });
-        console.log(`[WebRTC Controller] Message sent to recipient ${toEmail} on socket ${recipientSocketId}`);
+        // Send incomingCall to recipient so their app navigates to call screen
+        io.to(recipientSocketId).emit('incomingCall', {
+          from: fromEmail,
+          fromEmail,
+          fromName: fromEmail,
+          toEmail,
+        });
+        console.log(`[WebRTC Controller] incomingCall sent to recipient ${toEmail} on socket ${recipientSocketId}`);
 
         if (callerSocketId) {
-          io.to(callerSocketId).emit('message', { type: 'WEBRTC', message, toEmail });
-          console.log(`[WebRTC Controller] Message sent to caller ${fromEmail} on socket ${callerSocketId}`);
+          // Send incomingCall to caller (Pi) so it navigates to call screen too
+          io.to(callerSocketId).emit('incomingCall', {
+            from: fromEmail,
+            fromEmail,
+            fromName: fromEmail,
+            to: toEmail,
+            toEmail,
+            toName: toEmail,
+          });
+          console.log(`[WebRTC Controller] incomingCall sent to caller ${fromEmail} on socket ${callerSocketId}`);
         }
 
         return res.json({ success: true, message: 'Message sent' });
