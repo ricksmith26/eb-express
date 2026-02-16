@@ -233,9 +233,9 @@ class PatientController {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      // Fetch related contacts for this patient
-      const patientReference = `Patient/${patient._id}`;
-      const contacts = await RelatedPerson.find({ "patient.reference": patientReference });
+      // Fetch related contacts for this patient (search both _id and FHIR id formats)
+      const patientRefs = [`Patient/${patient._id}`, `Patient/${patient.id}`];
+      const contacts = await RelatedPerson.find({ "patient.reference": { $in: patientRefs } });
 
       res.json({ patient, contacts });
     } catch (error) {
@@ -315,15 +315,16 @@ class PatientController {
         return res.status(404).json({ success: false, error: "Patient not found" });
       }
 
-      // Build reference strings for queries
+      // Build reference strings for queries (search both _id and FHIR id formats)
       const patientRef = `Patient/${patient._id}`;
+      const patientRefs = [`Patient/${patient._id}`, `Patient/${patient.id}`];
 
       // Fetch all clinical resources in parallel
       const [allergies, conditions, medications, contacts] = await Promise.all([
         AllergyIntolerance.find({ "patient.reference": patientRef }).sort({ recordedDate: -1 }),
         Condition.find({ "subject.reference": patientRef }).sort({ recordedDate: -1 }),
         MedicationStatement.find({ "subject.reference": patientRef }).sort({ dateAsserted: -1 }),
-        RelatedPerson.find({ "patient.reference": patientRef }),
+        RelatedPerson.find({ "patient.reference": { $in: patientRefs } }),
       ]);
 
       // Get NHS number from identifier
