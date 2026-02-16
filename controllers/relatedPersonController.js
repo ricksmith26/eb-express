@@ -140,8 +140,9 @@ class RelatedPersonController {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      const patientReference = `Patient/${patient._id}`;
-      const relatedPersons = await RelatedPerson.find({ "patient.reference": patientReference });
+      // Search by both FHIR id and MongoDB _id (provisioning uses patient.id)
+      const patientReferences = [`Patient/${patient.id}`, `Patient/${patient._id}`];
+      const relatedPersons = await RelatedPerson.find({ "patient.reference": { $in: patientReferences } });
 
       // Format for mobile app - return simple contact list with profile photos
       const contacts = await Promise.all(relatedPersons.map(async (person) => {

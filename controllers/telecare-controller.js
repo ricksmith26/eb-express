@@ -1,5 +1,7 @@
 import telecareService from '../services/telecare-service.js';
 import telecareEscalation from '../services/telecare-escalation-service.js';
+import Patient from '../models/PatientSchema.js';
+import RelatedPerson from '../models/RelatedPerson.js';
 
 class TelecareController {
     // ==========================================
@@ -203,6 +205,218 @@ class TelecareController {
         } catch (error) {
             console.error('Error regenerating password:', error);
             res.status(500).json({ error: 'Failed to regenerate password', code: 'PASSWORD_REGEN_ERROR' });
+        }
+    }
+
+    // ==========================================
+    // Device Self-Provisioning (called by Pi during onboarding)
+    // ==========================================
+
+    async provisionDevice(req, res) {
+        try {
+            const {
+                deviceId,
+                deviceType = 'fixed_unit',
+                email,
+                userName,
+                userAddress,
+                userPhone,
+                emergencyContactName,
+                emergencyContactPhone,
+                emergencyContactRelationship,
+                secondaryContactName,
+                secondaryContactPhone,
+                gpName,
+                gpPhone,
+                patientId: existingPatientId,
+            } = req.body;
+
+            if (!deviceId) {
+                return res.status(400).json({ error: 'deviceId is required', code: 'MISSING_DEVICE_ID' });
+            }
+            if (!email) {
+                return res.status(400).json({ error: 'email is required', code: 'MISSING_EMAIL' });
+            }
+
+            // 1. Find or create Patient by email
+            let patient = await Patient.findOne({
+                'telecom.system': 'email',
+                'telecom.value': email
+            });
+
+            // Parse name parts
+            const nameParts = (userName || '').trim().split(/\s+/);
+            const givenNames = nameParts.slice(0, -1);
+            const familyName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0] || '';
+
+            if (patient) {
+                // Update existing patient with latest data from onboarding
+                if (userName) {
+                    patient.name = [{
+                        use: 'official',
+                        family: familyName,
+                        given: givenNames.length > 0 ? givenNames : [familyName]
+                    }];
+                }
+                if (userAddress) {
+                    patient.address = [{ line: [userAddress] }];
+                }
+                // Update phone if provided
+                if (userPhone) {
+                    const phoneIdx = patient.telecom.findIndex(t => t.system === 'phone');
+                    if (phoneIdx >= 0) {
+                        patient.telecom[phoneIdx].value = userPhone;
+                    } else {
+                        patient.telecom.push({ system: 'phone', value: userPhone, use: 'mobile' });
+                    }
+                }
+                // Update GP info
+                if (gpName || gpPhone) {
+                    if (!patient.medicalInfo) patient.medicalInfo = {};
+                    if (gpName) patient.medicalInfo.gpPractice = gpName;
+                    if (gpPhone) patient.medicalInfo.gpPhone = gpPhone;
+                }
+                await patient.save();
+                console.log(`[Telecare] Updated existing patient: ${patient.id} (${email})`);
+            } else {
+                // Create new patient
+                const telecom = [{ system: 'email', value: email, use: 'home' }];
+                if (userPhone) {
+                    telecom.push({ system: 'phone', value: userPhone, use: 'mobile' });
+                }
+
+                patient = new Patient({
+                    name: [{
+                        use: 'official',
+                        family: familyName,
+                        given: givenNames.length > 0 ? givenNames : [familyName]
+                    }],
+                    address: userAddress ? [{ line: [userAddress] }] : [],
+                    telecom,
+                    active: true,
+                    medicalInfo: (gpName || gpPhone) ? {
+                        gpPractice: gpName || undefined,
+                        gpPhone: gpPhone || undefined,
+                    } : undefined,
+                });
+                await patient.save();
+                console.log(`[Telecare] Created new patient: ${patient.id} (${email})`);
+            }
+
+            // 2. Upsert emergency contacts as RelatedPerson
+            const patientRef = `Patient/${patient.id}`;
+
+            if (emergencyContactName) {
+                const ecNameParts = emergencyContactName.trim().split(/\s+/);
+                const ecFamily = ecNameParts.length > 1 ? ecNameParts[ecNameParts.length - 1] : ecNameParts[0];
+                const ecGiven = ecNameParts.slice(0, -1);
+
+                await RelatedPerson.findOneAndUpdate(
+                    {
+                        'patient.reference': patientRef,
+                        'name.family': ecFamily,
+                    },
+                    {
+                        $set: {
+                            name: [{ family: ecFamily, given: ecGiven.length > 0 ? ecGiven : [ecFamily] }],
+                            telecom: emergencyContactPhone
+                                ? [{ system: 'phone', value: emergencyContactPhone, use: 'mobile' }]
+                                : [],
+                            relationship: [{
+                                coding: [{
+                                    system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode',
+                                    code: 'FAMMEMB',
+                                    display: emergencyContactRelationship || 'Family Member'
+                                }]
+                            }],
+                            patient: { reference: patientRef },
+                        }
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+
+            if (secondaryContactName) {
+                const scNameParts = secondaryContactName.trim().split(/\s+/);
+                const scFamily = scNameParts.length > 1 ? scNameParts[scNameParts.length - 1] : scNameParts[0];
+                const scGiven = scNameParts.slice(0, -1);
+
+                await RelatedPerson.findOneAndUpdate(
+                    {
+                        'patient.reference': patientRef,
+                        'name.family': scFamily,
+                    },
+                    {
+                        $set: {
+                            name: [{ family: scFamily, given: scGiven.length > 0 ? scGiven : [scFamily] }],
+                            telecom: secondaryContactPhone
+                                ? [{ system: 'phone', value: secondaryContactPhone, use: 'mobile' }]
+                                : [],
+                            relationship: [{
+                                coding: [{
+                                    system: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode',
+                                    code: 'FAMMEMB',
+                                    display: 'Family Member'
+                                }]
+                            }],
+                            patient: { reference: patientRef },
+                        }
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+
+            // 3. Create SIP credentials and telecare_devices entry in postgres
+            const device = await telecareService.createDevice({
+                deviceId,
+                deviceType,
+                patientId: patient.id,
+                userName: userName || undefined,
+                userAddress: userAddress || undefined,
+                userPhone: userPhone || undefined,
+                emergencyContactName: emergencyContactName || undefined,
+                emergencyContactPhone: emergencyContactPhone || undefined,
+                emergencyContactRelationship: emergencyContactRelationship || undefined,
+                secondaryContactName: secondaryContactName || undefined,
+                secondaryContactPhone: secondaryContactPhone || undefined,
+                gpName: gpName || undefined,
+                gpPhone: gpPhone || undefined,
+            });
+
+            console.log(`[Telecare] Provisioned device ${deviceId} for patient ${patient.id}`);
+
+            res.status(201).json({
+                deviceId,
+                patientId: patient.id,
+                sipPassword: device.sipPassword,
+                sipServer: 'asterisk.brigid-personal-assistant.com',
+                sipPort: 5060,
+                wssPort: 4443,
+                transport: 'wss'
+            });
+        } catch (error) {
+            console.error('Error provisioning device:', error);
+            if (error.code === '23505') {
+                // Device already exists - return existing credentials
+                try {
+                    const credentials = await telecareService.getDeviceCredentials(req.body.deviceId);
+                    if (credentials) {
+                        const existingDevice = await telecareService.getDevice(req.body.deviceId);
+                        return res.status(200).json({
+                            deviceId: req.body.deviceId,
+                            patientId: existingDevice?.patient_id || null,
+                            sipPassword: credentials.sip_password,
+                            sipServer: 'asterisk.brigid-personal-assistant.com',
+                            sipPort: 5060,
+                            wssPort: 4443,
+                            transport: 'wss'
+                        });
+                    }
+                } catch (fallbackErr) {
+                    console.error('Error fetching existing credentials:', fallbackErr);
+                }
+            }
+            res.status(500).json({ error: 'Failed to provision device', code: 'PROVISION_ERROR' });
         }
     }
 

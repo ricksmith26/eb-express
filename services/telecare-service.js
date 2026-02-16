@@ -61,10 +61,19 @@ class TelecareService {
         organizationId,
         fhirDeviceId,
         patientId,
-        notes
+        notes,
+        // NOW-IP contact fields (for Asterisk AGI script access)
+        userName,
+        userAddress,
+        userPhone,
+        emergencyContactName,
+        emergencyContactPhone,
+        emergencyContactRelationship,
+        secondaryContactName,
+        secondaryContactPhone,
+        gpName,
+        gpPhone,
     }) {
-        // Contact info (user, emergencyContact, secondaryContact, gp) is stored in MongoDB
-        // Patient and RelatedPerson collections - not in PostgreSQL
         const client = await pool.connect();
 
         try {
@@ -101,22 +110,42 @@ class TelecareService {
                 ON CONFLICT (id) DO NOTHING
             `, [deviceId]);
 
-            // 4. Create telecare_devices entry
+            // 4. Create telecare_devices entry with NOW-IP contact fields
             const deviceResult = await client.query(`
                 INSERT INTO telecare_devices (
                     device_id, device_type, device_model,
-                    organization_id, fhir_device_id, patient_id, notes, is_active
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+                    organization_id, fhir_device_id, patient_id, notes, is_active,
+                    user_name, user_address, user_phone,
+                    emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+                    secondary_contact_name, secondary_contact_phone,
+                    gp_name, gp_phone
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 ON CONFLICT (device_id) DO UPDATE SET
-                    device_type = EXCLUDED.device_type,
-                    device_model = EXCLUDED.device_model,
-                    organization_id = EXCLUDED.organization_id,
-                    fhir_device_id = EXCLUDED.fhir_device_id,
-                    patient_id = EXCLUDED.patient_id,
-                    notes = EXCLUDED.notes,
+                    device_type = COALESCE(EXCLUDED.device_type, telecare_devices.device_type),
+                    device_model = COALESCE(EXCLUDED.device_model, telecare_devices.device_model),
+                    organization_id = COALESCE(EXCLUDED.organization_id, telecare_devices.organization_id),
+                    fhir_device_id = COALESCE(EXCLUDED.fhir_device_id, telecare_devices.fhir_device_id),
+                    patient_id = COALESCE(EXCLUDED.patient_id, telecare_devices.patient_id),
+                    notes = COALESCE(EXCLUDED.notes, telecare_devices.notes),
+                    user_name = COALESCE(EXCLUDED.user_name, telecare_devices.user_name),
+                    user_address = COALESCE(EXCLUDED.user_address, telecare_devices.user_address),
+                    user_phone = COALESCE(EXCLUDED.user_phone, telecare_devices.user_phone),
+                    emergency_contact_name = COALESCE(EXCLUDED.emergency_contact_name, telecare_devices.emergency_contact_name),
+                    emergency_contact_phone = COALESCE(EXCLUDED.emergency_contact_phone, telecare_devices.emergency_contact_phone),
+                    emergency_contact_relationship = COALESCE(EXCLUDED.emergency_contact_relationship, telecare_devices.emergency_contact_relationship),
+                    secondary_contact_name = COALESCE(EXCLUDED.secondary_contact_name, telecare_devices.secondary_contact_name),
+                    secondary_contact_phone = COALESCE(EXCLUDED.secondary_contact_phone, telecare_devices.secondary_contact_phone),
+                    gp_name = COALESCE(EXCLUDED.gp_name, telecare_devices.gp_name),
+                    gp_phone = COALESCE(EXCLUDED.gp_phone, telecare_devices.gp_phone),
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING *
-            `, [deviceId, deviceType, deviceModel, organizationId, fhirDeviceId, patientId, notes]);
+            `, [
+                deviceId, deviceType, deviceModel, organizationId, fhirDeviceId, patientId, notes,
+                userName, userAddress, userPhone,
+                emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
+                secondaryContactName, secondaryContactPhone,
+                gpName, gpPhone
+            ]);
 
             await client.query('COMMIT');
 

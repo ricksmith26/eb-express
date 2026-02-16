@@ -14,6 +14,7 @@ import RelatedPerson from '../models/RelatedPerson.js';
 import { verifyCognitoToken, requirePractitioner } from '../middleware/cognitoAuth.js';
 import { setOrgContext, requireRole, requirePermission } from '../middleware/rbac.js';
 import { verifyAccessToken } from '../middleware/auth.js';
+import { verifyDeviceToken } from '../middleware/deviceAuth.js';
 import { io } from '../app.js';
 
 class TelecareRoutes {
@@ -445,6 +446,16 @@ class TelecareRoutes {
                     res.status(500).json({ error: 'Failed to get escalation status' });
                 }
             }
+        );
+
+        // ==========================================
+        // Device Self-Provisioning (device JWT auth)
+        // ==========================================
+
+        // POST /telecare/devices/provision - Pi self-provisions during onboarding
+        this.router.post('/devices/provision',
+            verifyDeviceToken,
+            telecareController.provisionDevice.bind(telecareController)
         );
 
         // ==========================================
