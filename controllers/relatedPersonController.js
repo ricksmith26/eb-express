@@ -87,13 +87,17 @@ class RelatedPersonController {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      const patientReference = `Patient/${patient._id}`;
-      const relatedPersons = await RelatedPerson.find({ "patient.reference": patientReference });
+      // Search by both FHIR id and MongoDB _id (onboarding uses patient.id)
+      const patientReferences = [`Patient/${patient.id}`, `Patient/${patient._id}`];
+      const relatedPersons = await RelatedPerson.find({ "patient.reference": { $in: patientReferences } });
 
-      const contacts = relatedPersons.map((person) => ({
-        name: `${person.name[0].given[0]} ${person.name[0].family}`,
-        email: `${person.telecom[1].value}`
-      }));
+      const contacts = relatedPersons.map((person) => {
+        const emailTelecom = person.telecom?.find(t => t.system === 'email');
+        return {
+          name: `${person.name[0].given[0]} ${person.name[0].family}`,
+          email: emailTelecom?.value || ''
+        };
+      });
 
       res.json(JSON.stringify(contacts));
     } catch (error) {
