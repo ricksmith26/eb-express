@@ -81,7 +81,7 @@ class LivekitController {
         const user = await User.findOne({ email: identifier });
 
         if (user) {
-          identity = user.googleId;
+          identity = user.googleId || user._id.toString();
           tokenMetadata = {
             email: user.email,
             name: user.name,
